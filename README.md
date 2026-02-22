@@ -28,8 +28,9 @@ All commands below assume you are in the project root (`patreon-view/`).
 ### Download content
 
 ```bash
-# From project root
-patreon-dl -C data/embed.conf -o data -y <patreon-url>
+# From data/ subdirectory (keeps .patreon-dl tracking db contained)
+cd data
+patreon-dl -C embed.conf -y <patreon-url>
 ```
 
 Cookie config lives in `data/embed.conf`. Refresh cookies when they expire.
