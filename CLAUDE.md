@@ -13,7 +13,7 @@ patreon-view/                         # Root git repo
 │   │   ├── home.handlebars           # Post grid with search + creator filter
 │   │   └── post.handlebars           # Post detail with media modals
 │   └── public/                       # Static assets (styles.css, js/home.js, js/post.js)
-├── encode-to-480p.ts                 # Batch video encoder (ffmpeg, h264, CRF 23)
+├── encode-to-480p.ts                 # Batch video encoder (VideoToolbox h264, q:v 65)
 ├── data/                             # All downloaded content (gitignored)
 │   ├── [creator]/posts/              # Downloaded content per creator
 │   ├── [creator]/campaign_info/      # Creator metadata (info.txt)
@@ -61,6 +61,7 @@ The server reads posts from `../data/*/posts/` relative to `patreon-viewer/`. Cr
 - `GET /post/:id` — Post detail view
 - `GET /api/posts` — JSON API (supports `?creator=` filter)
 - `GET /api/creators` — JSON list of creators with display names
+- `GET /post/:id/attachments.zip` — Download all attachments as ZIP
 - `GET /media/:creatorDir/:postDir/:type/:filename` — Serves media files
 
 ## Development Notes

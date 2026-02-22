@@ -1,0 +1,81 @@
+/* Custom styles for Patreon Post Viewer */
+
+.post-card {
+    transition: transform 0.2s;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.post-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* Post content preview on home page */
+.post-excerpt {
+    max-height: 100px;
+    overflow: hidden;
+}
+
+/* Full post content on post page */
+.post-content {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.badge-custom {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.attachment-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+.stats-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+}
+
+.post-meta {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .post-card {
+        margin-bottom: 1rem;
+    }
+
+    .stats-card .card-title {
+        font-size: 1.5rem;
+    }
+}
+
+/* Custom scrollbar for attachment lists */
+.attachment-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.attachment-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.attachment-list::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+}
+
+.attachment-list::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}

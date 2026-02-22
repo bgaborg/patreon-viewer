@@ -44,9 +44,9 @@
     <div class="col-lg-6 col-xl-4 mb-4 post-item" data-search="{{title}} {{teaser}} {{type}} {{creatorDir}}">
         <div class="card post-card h-100">
             {{#if hasThumbnail}}
-            <img src="/media/{{creatorDir}}/{{dirName}}/post_info/thumbnail.jpg" class="card-img-top post-image-clickable" style="height: 200px; object-fit: cover; cursor: pointer;" alt="{{title}}" data-post-id="{{id}}">
+            <img src="{{encodeMediaPath creatorDir dirName "post_info" thumbnailFile}}" class="card-img-top post-image-clickable" style="height: 200px; object-fit: cover; cursor: pointer;" alt="{{title}}" data-post-id="{{id}}">
             {{else if hasCoverImage}}
-            <img src="/media/{{creatorDir}}/{{dirName}}/post_info/cover-image.jpg" class="card-img-top post-image-clickable" style="height: 200px; object-fit: cover; cursor: pointer;" alt="{{title}}" data-post-id="{{id}}">
+            <img src="{{encodeMediaPath creatorDir dirName "post_info" coverImageFile}}" class="card-img-top post-image-clickable" style="height: 200px; object-fit: cover; cursor: pointer;" alt="{{title}}" data-post-id="{{id}}">
             {{else}}
             <div class="card-img-top d-flex align-items-center justify-content-center bg-secondary text-white post-image-clickable" style="height: 200px; cursor: pointer;" data-post-id="{{id}}">
                 <i class="fas fa-image fa-3x"></i>
@@ -57,11 +57,7 @@
                 <div class="mb-2">
                     {{#if type}}
                     <span class="badge bg-primary badge-custom me-2">
-                        {{#eq type "video_embed"}}
-                            <i class="fas fa-video me-1"></i>Video
-                        {{else}}
-                            <i class="fas fa-file me-1"></i>{{type}}
-                        {{/eq}}
+                        {{{postTypeBadge type}}}
                     </span>
                     {{/if}}
 
@@ -81,11 +77,11 @@
                 <h5 class="card-title">{{title}}</h5>
 
                 {{#if teaser}}
-                <p class="card-text post-content text-muted">
+                <p class="card-text post-excerpt text-muted">
                     {{truncate (stripHtml teaser) 150}}
                 </p>
                 {{else if content}}
-                <p class="card-text post-content text-muted">
+                <p class="card-text post-excerpt text-muted">
                     {{truncate (stripHtml content) 150}}
                 </p>
                 {{/if}}
@@ -112,10 +108,12 @@
                     </p>
                     {{/if}}
 
+                    {{#if id}}
                     <a href="/post/{{id}}" class="btn btn-primary">
                         <i class="fas fa-eye me-1"></i>
                         View Details
                     </a>
+                    {{/if}}
                 </div>
             </div>
         </div>

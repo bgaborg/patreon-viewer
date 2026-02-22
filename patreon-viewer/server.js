@@ -3,80 +3,62 @@ const fs = require('fs-extra');
 const path = require('path');
 const moment = require('moment');
 const { engine } = require('express-handlebars');
-const helpers = require('handlebars-helpers')();
+const archiver = require('archiver');
 
 const app = express();
 const PORT = 3000;
 
+// Path to the data directory containing creator folders
+const DATA_DIR = path.resolve(__dirname, '../data');
 
 // Configure Handlebars
 app.engine('handlebars', engine({
     defaultLayout: 'main',
     helpers: {
-        // Use handlebars-helpers library for common functions
-        ...helpers,
-
-        // Custom helpers with arrow functions
-        formatDate: (dateString) => moment(dateString).format('MMMM DD, YYYY'),
-        stripHtml: (html) => html.replace(/<[^>]*>/g, ''),
+        formatDate: (dateString) => dateString ? moment(dateString).format('MMMM DD, YYYY') : '',
+        stripHtml: (html) => (html || '').replace(/<[^>]*>/g, ''),
         truncate: (str, length) => {
+            if (!str) return '';
             if (str.length > length) {
                 return `${str.substring(0, length)}...`;
             }
             return str;
         },
-        json: (context) => JSON.stringify(context, null, 2),
+        postTypeBadge: (type) => {
+            const types = {
+                video_embed: { icon: 'fa-video', label: 'Video' },
+                video_external_file: { icon: 'fa-video', label: 'Video' },
+                audio_embed: { icon: 'fa-music', label: 'Audio' },
+                image_file: { icon: 'fa-image', label: 'Image' },
+                text_only: { icon: 'fa-align-left', label: 'Text' },
+            };
+            const safeType = (type || '').replace(/[<>&"']/g, '');
+            const t = types[type] || { icon: 'fa-file', label: safeType };
+            return `<i class="fas ${t.icon} me-1"></i>${t.label}`;
+        },
+        encodeMediaPath: (...segments) => {
+            const parts = segments.slice(0, -1);
+            return '/media/' + parts.map(s => encodeURIComponent(s)).join('/');
+        },
         endsWith: (str, suffix) => {
             if (!str || !suffix) return false;
             return str.toString().endsWith(suffix.toString());
         },
-        eq: (a, b) => a === b,
-        startsWith: (str, prefix) => {
-            if (!str || !prefix) return false;
-            return str.toString().startsWith(prefix.toString());
-        },
-        formatBoolean: (value, trueLabel, falseLabel) => {
-            if (value === true) return trueLabel || 'Yes';
-            if (value === false) return falseLabel || 'No';
-            return value; // Return as-is if not boolean
-        },
-        yesNo: (value) => {
-            if (value === true) return 'Yes';
-            if (value === false) return 'No';
-            return value;
-        },
-        displayBoolean: (value, fieldName) => {
-            if (value === true) {
-                switch(fieldName) {
-                    case 'hasThumbnail': return 'Has Thumbnail';
-                    case 'hasCoverImage': return 'Has Cover Image';
-                    case 'isLive': return 'Live';
-                    case 'isPublic': return 'Public';
-                    case 'isPaid': return 'Paid Content';
-                    case 'isPatronOnly': return 'Patron Only';
-                    default: return 'Yes';
-                }
+        eq: function(a, b, options) {
+            if (options && options.fn) {
+                return a === b ? options.fn(this) : options.inverse(this);
             }
-            if (value === false) {
-                switch(fieldName) {
-                    case 'hasThumbnail': return 'No Thumbnail';
-                    case 'hasCoverImage': return 'No Cover Image';
-                    case 'isLive': return 'Not Live';
-                    case 'isPublic': return 'Private';
-                    case 'isPaid': return 'Free Content';
-                    case 'isPatronOnly': return 'Public Access';
-                    default: return 'No';
-                }
-            }
-            return value;
+            return a === b;
+        },
+        isVideo: (filename) => {
+            if (!filename) return false;
+            const lower = filename.toLowerCase();
+            return lower.endsWith('.mp4') || lower.endsWith('.webm') || lower.endsWith('.mkv');
         }
     }
 }));
 app.set('view engine', 'handlebars');
-app.use(express.static('public'));
-
-// Path to the data directory containing creator folders
-const DATA_DIR = path.join(__dirname, '../data');
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Function to get list of creators with display names
 async function getCreators() {
@@ -88,7 +70,6 @@ async function getCreators() {
         const postsDir = path.join(DATA_DIR, dir, 'posts');
         if (!await fs.pathExists(postsDir)) continue;
 
-        // Try to read display name from campaign_info/info.txt
         let displayName = dir;
         const infoFile = path.join(DATA_DIR, dir, 'campaign_info', 'info.txt');
         if (await fs.pathExists(infoFile)) {
@@ -101,6 +82,101 @@ async function getCreators() {
     }
 
     return creators;
+}
+
+// Resolve image file with jpg/webp fallback, returns null if neither exists
+async function resolveImage(dir, baseName) {
+    const jpg = path.join(dir, `${baseName}.jpg`);
+    if (await fs.pathExists(jpg)) return jpg;
+    const webp = path.join(dir, `${baseName}.webp`);
+    if (await fs.pathExists(webp)) return webp;
+    return null;
+}
+
+// Find a single post by ID without scanning everything
+async function findPostById(postId) {
+    const creatorDirs = await fs.readdir(DATA_DIR);
+    for (const creatorDir of creatorDirs) {
+        if (creatorDir.startsWith('.')) continue;
+        const postsDir = path.join(DATA_DIR, creatorDir, 'posts');
+        if (!await fs.pathExists(postsDir)) continue;
+        const postDirs = await fs.readdir(postsDir);
+        for (const postDir of postDirs) {
+            if (!postDir.startsWith(postId + ' ')) continue;
+            const postPath = path.join(postsDir, postDir);
+            const stats = await fs.stat(postPath);
+            if (!stats.isDirectory()) continue;
+            return readSinglePost(creatorDir, postDir, postPath);
+        }
+    }
+    return null;
+}
+
+// Read a single post directory into a post object
+async function readSinglePost(creatorDir, postDir, postPath) {
+    const postInfoPath = path.join(postPath, 'post_info');
+
+    const infoFile = path.join(postInfoPath, 'info.txt');
+    let postInfo = {};
+    if (await fs.pathExists(infoFile)) {
+        const infoContent = await fs.readFile(infoFile, 'utf8');
+        postInfo = parseInfoFile(infoContent);
+    }
+
+    const apiFile = path.join(postInfoPath, 'post-api.json');
+    let apiData = {};
+    if (await fs.pathExists(apiFile)) {
+        try {
+            const apiContent = await fs.readFile(apiFile, 'utf8');
+            apiData = JSON.parse(apiContent);
+        } catch (e) {
+            console.error(`Invalid JSON in ${apiFile}:`, e.message);
+        }
+    }
+
+    const attachmentsPath = path.join(postPath, 'attachments');
+    let attachments = [];
+    if (await fs.pathExists(attachmentsPath)) {
+        attachments = (await fs.readdir(attachmentsPath)).filter(f => !f.startsWith('.'));
+    }
+
+    const embedPath = path.join(postPath, 'embed');
+    let embedFiles = [];
+    if (await fs.pathExists(embedPath)) {
+        embedFiles = (await fs.readdir(embedPath)).filter(f => !f.startsWith('.'));
+    }
+
+    const imagesPath = path.join(postPath, 'images');
+    let images = [];
+    if (await fs.pathExists(imagesPath)) {
+        images = (await fs.readdir(imagesPath)).filter(f => !f.startsWith('.'));
+    }
+
+    const thumbnailPath = await resolveImage(postInfoPath, 'thumbnail');
+    const coverImagePath = await resolveImage(postInfoPath, 'cover-image');
+
+    return {
+        id: postInfo.ID || apiData.data?.id,
+        title: postInfo.Title || apiData.data?.attributes?.title,
+        content: postInfo.Content || apiData.data?.attributes?.content,
+        teaser: postInfo.Teaser,
+        type: postInfo.Type || apiData.data?.attributes?.post_type,
+        published: postInfo.Published || apiData.data?.attributes?.published_at,
+        lastEdited: postInfo['Last Edited'] || apiData.data?.attributes?.edited_at,
+        url: postInfo.URL || apiData.data?.attributes?.url,
+        likeCount: apiData.data?.attributes?.like_count,
+        commentCount: apiData.data?.attributes?.comment_count,
+        attachments,
+        embedFiles,
+        images,
+        hasThumbnail: !!thumbnailPath,
+        thumbnailFile: thumbnailPath ? path.basename(thumbnailPath) : null,
+        hasCoverImage: !!coverImagePath,
+        coverImageFile: coverImagePath ? path.basename(coverImagePath) : null,
+        creatorDir,
+        dirName: postDir,
+        apiData: apiData.data?.attributes
+    };
 }
 
 // Function to read post data from all creator directories
@@ -126,76 +202,8 @@ async function readPostData(creatorFilter) {
 
                 if (stats.isDirectory()) {
                     try {
-                        const postInfoPath = path.join(postPath, 'post_info');
-
-                        // Read info.txt
-                        const infoFile = path.join(postInfoPath, 'info.txt');
-                        let postInfo = {};
-
-                        if (await fs.pathExists(infoFile)) {
-                            const infoContent = await fs.readFile(infoFile, 'utf8');
-                            postInfo = parseInfoFile(infoContent);
-                        }
-
-                        // Read post-api.json if available
-                        const apiFile = path.join(postInfoPath, 'post-api.json');
-                        let apiData = {};
-
-                        if (await fs.pathExists(apiFile)) {
-                            const apiContent = await fs.readFile(apiFile, 'utf8');
-                            apiData = JSON.parse(apiContent);
-                        }
-
-                        // Check for attachments
-                        const attachmentsPath = path.join(postPath, 'attachments');
-                        let attachments = [];
-                        if (await fs.pathExists(attachmentsPath)) {
-                            attachments = await fs.readdir(attachmentsPath);
-                            attachments = attachments.filter(file => !file.startsWith('.'));
-                        }
-
-                        // Check for embedded content
-                        const embedPath = path.join(postPath, 'embed');
-                        let embedFiles = [];
-                        if (await fs.pathExists(embedPath)) {
-                            embedFiles = await fs.readdir(embedPath);
-                            embedFiles = embedFiles.filter(file => !file.startsWith('.'));
-                        }
-
-                        // Check for images
-                        const imagesPath = path.join(postPath, 'images');
-                        let images = [];
-                        if (await fs.pathExists(imagesPath)) {
-                            images = await fs.readdir(imagesPath);
-                            images = images.filter(file => !file.startsWith('.'));
-                        }
-
-                        // Check for thumbnails
-                        const thumbnailPath = path.join(postInfoPath, 'thumbnail.jpg');
-                        const coverImagePath = path.join(postInfoPath, 'cover-image.jpg');
-
-                        const post = {
-                            id: postInfo.ID || apiData.data?.id,
-                            title: postInfo.Title || apiData.data?.attributes?.title,
-                            content: postInfo.Content || apiData.data?.attributes?.content,
-                            teaser: postInfo.Teaser,
-                            type: postInfo.Type || apiData.data?.attributes?.post_type,
-                            published: postInfo.Published || apiData.data?.attributes?.published_at,
-                            lastEdited: postInfo['Last Edited'] || apiData.data?.attributes?.edited_at,
-                            url: postInfo.URL || apiData.data?.attributes?.url,
-                            likeCount: apiData.data?.attributes?.like_count,
-                            commentCount: apiData.data?.attributes?.comment_count,
-                            attachments: attachments,
-                            embedFiles: embedFiles,
-                            images: images,
-                            hasThumbnail: await fs.pathExists(thumbnailPath),
-                            hasCoverImage: await fs.pathExists(coverImagePath),
-                            creatorDir: creatorDir,
-                            dirName: postDir,
-                            apiData: apiData.data?.attributes
-                        };
-
-                        posts.push(post);
+                        const post = await readSinglePost(creatorDir, postDir, postPath);
+                        if (post) posts.push(post);
                     } catch (error) {
                         console.error(`Error reading post ${postDir}:`, error.message);
                     }
@@ -203,7 +211,6 @@ async function readPostData(creatorFilter) {
             }
         }
 
-        // Sort posts by published date (newest first)
         posts.sort((a, b) => {
             const dateA = new Date(a.published || 0);
             const dateB = new Date(b.published || 0);
@@ -217,16 +224,18 @@ async function readPostData(creatorFilter) {
     }
 }
 
-// Function to parse info.txt file
 function parseInfoFile(content) {
     const lines = content.split('\n');
     const post = {};
+    let currentKey = null;
 
     for (const line of lines) {
-        if (line.includes(':')) {
-            const [key, ...valueParts] = line.split(':');
-            const value = valueParts.join(':').trim();
-            post[key.trim()] = value;
+        const match = line.match(/^([A-Za-z][\w\s]*?):\s?(.*)/);
+        if (match) {
+            currentKey = match[1].trim();
+            post[currentKey] = match[2];
+        } else if (currentKey && line.startsWith('  ')) {
+            post[currentKey] += '\n' + line;
         }
     }
 
@@ -254,8 +263,7 @@ app.get('/', async (req, res) => {
 
 app.get('/post/:id', async (req, res) => {
     try {
-        const posts = await readPostData();
-        const post = posts.find(p => p.id === req.params.id);
+        const post = await findPostById(req.params.id);
 
         if (!post) {
             return res.status(404).render('error', { error: 'Post not found' });
@@ -292,12 +300,61 @@ app.get('/api/creators', async (req, res) => {
     }
 });
 
-// Serve media files
-app.get('/media/:creatorDir/:postDir/:type/:filename', (req, res) => {
-    const { creatorDir, postDir, type, filename } = req.params;
-    const filePath = path.join(DATA_DIR, creatorDir, 'posts', postDir, type, filename);
+// Download all attachments as zip
+app.get('/post/:id/attachments.zip', async (req, res) => {
+    try {
+        const post = await findPostById(req.params.id);
+        if (!post || !post.attachments.length) {
+            return res.status(404).send('No attachments found');
+        }
 
-    if (fs.existsSync(filePath)) {
+        const attachmentsDir = path.join(DATA_DIR, post.creatorDir, 'posts', post.dirName, 'attachments');
+        // Extract display name: "hash - Display Name" -> "Display Name"
+        const dashIdx = post.creatorDir.indexOf(' - ');
+        const creator = dashIdx !== -1 ? post.creatorDir.substring(dashIdx + 3) : post.creatorDir;
+        const sanitize = (s) => s.replace(/[^a-zA-Z0-9 _-]/g, '').replace(/\s+/g, ' ').trim();
+        const zipName = `${sanitize(creator)} - ${sanitize(post.title)}.zip`;
+        const encodedZipName = encodeURIComponent(zipName);
+
+        res.set('Content-Type', 'application/zip');
+        res.set('Content-Disposition', `attachment; filename="${zipName}"; filename*=UTF-8''${encodedZipName}`);
+
+        const archive = archiver('zip');
+        archive.on('error', (err) => {
+            console.error('Archiver error:', err);
+            if (!res.headersSent) res.status(500).send('Failed to create zip');
+        });
+        archive.pipe(res);
+        for (const file of post.attachments) {
+            const filePath = path.join(attachmentsDir, file);
+            if (await fs.pathExists(filePath)) {
+                archive.file(filePath, { name: file });
+            }
+        }
+        await archive.finalize();
+    } catch (error) {
+        console.error('Error creating zip:', error);
+        if (!res.headersSent) res.status(500).send('Failed to create zip');
+    }
+});
+
+// Serve media files with path traversal protection
+const ALLOWED_MEDIA_TYPES = new Set(['post_info', 'attachments', 'embed', 'images']);
+
+app.get('/media/:creatorDir/:postDir/:type/:filename', async (req, res) => {
+    const { creatorDir, postDir, type, filename } = req.params;
+
+    if (!ALLOWED_MEDIA_TYPES.has(type)) {
+        return res.status(400).send('Invalid media type');
+    }
+
+    const filePath = path.resolve(DATA_DIR, creatorDir, 'posts', postDir, type, filename);
+
+    if (!filePath.startsWith(DATA_DIR)) {
+        return res.status(403).send('Forbidden');
+    }
+
+    if (await fs.pathExists(filePath)) {
         res.sendFile(filePath);
     } else {
         res.status(404).send('File not found');
@@ -305,7 +362,7 @@ app.get('/media/:creatorDir/:postDir/:type/:filename', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '127.0.0.1', () => {
     console.log(`Server running at http://localhost:${PORT}`);
     console.log(`Data directory: ${DATA_DIR}`);
 });

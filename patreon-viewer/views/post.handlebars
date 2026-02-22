@@ -13,20 +13,16 @@
     <div class="col-lg-8">
         <div class="card">
             {{#if post.hasThumbnail}}
-            <img src="/media/{{post.creatorDir}}/{{post.dirName}}/post_info/thumbnail.jpg" class="card-img-top" style="height: 300px; object-fit: cover;" alt="{{post.title}}">
+            <img src="{{encodeMediaPath post.creatorDir post.dirName "post_info" post.thumbnailFile}}" class="card-img-top" style="height: 300px; object-fit: cover;" alt="{{post.title}}">
             {{else if post.hasCoverImage}}
-            <img src="/media/{{post.creatorDir}}/{{post.dirName}}/post_info/cover-image.jpg" class="card-img-top" style="height: 300px; object-fit: cover;" alt="{{post.title}}">
+            <img src="{{encodeMediaPath post.creatorDir post.dirName "post_info" post.coverImageFile}}" class="card-img-top" style="height: 300px; object-fit: cover;" alt="{{post.title}}">
             {{/if}}
 
             <div class="card-body">
                 <div class="mb-3">
                     {{#if post.type}}
                     <span class="badge bg-primary me-2">
-                        {{#eq post.type "video_embed"}}
-                            <i class="fas fa-video me-1"></i>Video Post
-                        {{else}}
-                            <i class="fas fa-file me-1"></i>{{post.type}}
-                        {{/eq}}
+                        {{{postTypeBadge post.type}}}
                     </span>
                     {{/if}}
 
@@ -102,11 +98,14 @@
         <!-- Attachments -->
         {{#if post.attachments.length}}
         <div class="card mb-4">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
                     <i class="fas fa-paperclip me-2"></i>
                     Attachments ({{post.attachments.length}})
                 </h5>
+                <a href="/post/{{post.id}}/attachments.zip" class="btn btn-sm btn-outline-success" title="Download all as ZIP">
+                    <i class="fas fa-file-archive me-1"></i>ZIP
+                </a>
             </div>
             <div class="card-body">
                 <div class="attachment-list">
@@ -123,14 +122,14 @@
                         {{/if}}
                         <span class="flex-grow-1 small">{{this}}</span>
                         {{#if (endsWith this ".pdf")}}
-                            <a href="/media/{{../post.creatorDir}}/{{../post.dirName}}/attachments/{{this}}"
+                            <a href="{{encodeMediaPath ../post.creatorDir ../post.dirName "attachments" this}}"
                                class="btn btn-sm btn-outline-primary"
                                target="_blank"
                                title="Open {{this}}">
                                 <i class="fas fa-external-link-alt"></i>
                             </a>
                         {{else}}
-                            <a href="/media/{{../post.creatorDir}}/{{../post.dirName}}/attachments/{{this}}"
+                            <a href="{{encodeMediaPath ../post.creatorDir ../post.dirName "attachments" this}}"
                                class="btn btn-sm btn-outline-primary"
                                download
                                title="Download {{this}}">
@@ -156,9 +155,7 @@
             <div class="card-body">
                 {{#each post.embedFiles}}
                 <div class="d-flex align-items-center mb-2 p-2 border rounded">
-                    {{#if (endsWith this ".webm")}}
-                        <i class="fas fa-video text-danger me-2"></i>
-                    {{else if (endsWith this ".mp4")}}
+                    {{#if (isVideo this)}}
                         <i class="fas fa-video text-danger me-2"></i>
                     {{else if (endsWith this ".txt")}}
                         <i class="fas fa-file-text text-info me-2"></i>
@@ -166,14 +163,16 @@
                         <i class="fas fa-file text-secondary me-2"></i>
                     {{/if}}
                     <span class="flex-grow-1 small">{{this}}</span>
-                    {{#if (endsWith this ".webm")}}
-                        <button class="btn btn-sm btn-outline-primary"
-                                onclick="showVideo('{{../post.creatorDir}}', '{{../post.dirName}}', '{{this}}')"
+                    {{#if (isVideo this)}}
+                        <button class="btn btn-sm btn-outline-primary js-play-video"
+                                data-creator="{{../post.creatorDir}}"
+                                data-post="{{../post.dirName}}"
+                                data-file="{{this}}"
                                 title="Play {{this}}">
                             <i class="fas fa-play"></i>
                         </button>
                     {{else}}
-                        <a href="/media/{{../post.creatorDir}}/{{../post.dirName}}/embed/{{this}}"
+                        <a href="{{encodeMediaPath ../post.creatorDir ../post.dirName "embed" this}}"
                            class="btn btn-sm btn-outline-primary"
                            target="_blank"
                            title="View {{this}}">
@@ -199,10 +198,12 @@
                 <div class="row">
                     {{#each post.images}}
                     <div class="col-6 mb-2">
-                        <img src="/media/{{../post.creatorDir}}/{{../post.dirName}}/images/{{this}}"
-                             class="img-fluid rounded"
+                        <img src="{{encodeMediaPath ../post.creatorDir ../post.dirName "images" this}}"
+                             class="img-fluid rounded js-show-image"
                              alt="{{this}}"
-                             onclick="showImageModal('{{../post.creatorDir}}', '{{../post.dirName}}', '{{this}}')"
+                             data-creator="{{../post.creatorDir}}"
+                             data-post="{{../post.dirName}}"
+                             data-file="{{this}}"
                              style="cursor: pointer;">
                     </div>
                     {{/each}}

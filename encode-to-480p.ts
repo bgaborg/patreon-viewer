@@ -2,16 +2,15 @@
 
 import { execSync } from 'child_process';
 import { readdirSync, statSync, renameSync, unlinkSync } from 'fs';
-import { join } from 'path';
+import { join, resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { platform } from 'os';
 
 interface VideoResolution {
   width: number;
   height: number;
 }
 
-/**
- * Get video resolution using ffprobe
- */
 function getVideoResolution(filePath: string): VideoResolution | null {
   try {
     const output = execSync(
@@ -27,40 +26,22 @@ function getVideoResolution(filePath: string): VideoResolution | null {
   }
 }
 
-/**
- * Check if video is already 480p
- * For 480p, the smaller dimension should be 480 pixels
- */
 function is480p(resolution: VideoResolution): boolean {
   const smallerDimension = Math.min(resolution.width, resolution.height);
   return smallerDimension === 480;
 }
 
-/**
- * Encode video to 480p using ffmpeg
- */
-function encodeToP480(inputPath: string, outputPath: string): boolean {
+function encodeToP480(inputPath: string, outputPath: string, resolution: VideoResolution): boolean {
   try {
     console.log(`Encoding: ${inputPath}`);
 
-    // Use ffmpeg to scale video to 480p
-    // -vf scale=-2:480 for landscape (scales width automatically to maintain aspect ratio)
-    // -vf scale=480:-2 for portrait (scales height automatically to maintain aspect ratio)
-    // The -2 ensures the dimension is divisible by 2 (required for h264)
-
-    const resolution = getVideoResolution(inputPath);
-    if (!resolution) {
-      console.error(`Failed to get resolution for ${inputPath}`);
-      return false;
-    }
-
-    // Determine if video is portrait or landscape
     const isPortrait = resolution.height > resolution.width;
     const scaleFilter = isPortrait ? 'scale=480:-2' : 'scale=-2:480';
 
-    // Encode with h264 codec, reasonable quality
+    const videoCodec = platform() === 'darwin' ? 'h264_videotoolbox -q:v 65' : 'libx264 -crf 23';
+
     execSync(
-      `ffmpeg -i "${inputPath}" -vf "${scaleFilter}" -c:v libx264 -crf 23 -preset medium -c:a aac -b:a 128k -y "${outputPath}"`,
+      `ffmpeg -i "${inputPath}" -vf "${scaleFilter}" -c:v ${videoCodec} -c:a copy -y "${outputPath}"`,
       { stdio: 'inherit' }
     );
 
@@ -72,11 +53,10 @@ function encodeToP480(inputPath: string, outputPath: string): boolean {
   }
 }
 
-/**
- * Recursively find all MP4 files in a directory
- */
-function findMP4Files(dir: string): string[] {
-  const mp4Files: string[] = [];
+const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mkv'];
+
+function findVideoFiles(dir: string): string[] {
+  const videoFiles: string[] = [];
 
   try {
     const entries = readdirSync(dir);
@@ -86,35 +66,32 @@ function findMP4Files(dir: string): string[] {
       const stat = statSync(fullPath);
 
       if (stat.isDirectory()) {
-        // Recursively search subdirectories
-        mp4Files.push(...findMP4Files(fullPath));
-      } else if (stat.isFile() && entry.toLowerCase().endsWith('.mp4')) {
-        mp4Files.push(fullPath);
+        videoFiles.push(...findVideoFiles(fullPath));
+      } else if (stat.isFile() && VIDEO_EXTENSIONS.some(ext => entry.toLowerCase().endsWith(ext))) {
+        videoFiles.push(fullPath);
       }
     }
   } catch (error) {
     console.error(`Error reading directory ${dir}:`, error);
   }
 
-  return mp4Files;
+  return videoFiles;
 }
 
-/**
- * Main function to process all MP4 files
- */
 function main() {
-  const targetDir = './data';
+  const scriptDir = dirname(fileURLToPath(import.meta.url));
+  const targetDir = resolve(scriptDir, 'data');
 
-  console.log(`Scanning for MP4 files in: ${targetDir}`);
-  const mp4Files = findMP4Files(targetDir);
+  console.log(`Scanning for video files in: ${targetDir}`);
+  const videoFiles = findVideoFiles(targetDir);
 
-  console.log(`Found ${mp4Files.length} MP4 files`);
+  console.log(`Found ${videoFiles.length} video files`);
 
   let processed = 0;
   let skipped = 0;
   let failed = 0;
 
-  for (const filePath of mp4Files) {
+  for (const filePath of videoFiles) {
     const resolution = getVideoResolution(filePath);
 
     if (!resolution) {
@@ -130,26 +107,26 @@ function main() {
       console.log(`Already 480p - skipping`);
       skipped++;
     } else {
-      // Create temporary output path
-      const tempPath = filePath.replace(/\.mp4$/i, '_temp.mp4');
+      const outputPath = filePath.replace(/\.(mp4|webm|mkv)$/i, '.mp4');
+      const tempPath = filePath.replace(/\.(mp4|webm|mkv)$/i, '.encoding.mp4');
+      const isFormatConversion = filePath !== outputPath;
 
-      if (encodeToP480(filePath, tempPath)) {
+      if (encodeToP480(filePath, tempPath, resolution)) {
         try {
-          // Replace original file with encoded version
-          unlinkSync(filePath);
-          renameSync(tempPath, filePath);
+          // Rename temp to output first (atomic on POSIX), then clean up original
+          if (isFormatConversion) try { unlinkSync(outputPath); } catch {}
+          renameSync(tempPath, outputPath);
+          if (isFormatConversion) unlinkSync(filePath);
           console.log(`Replaced original file with 480p version`);
           processed++;
         } catch (error) {
           console.error(`Error replacing file ${filePath}:`, error);
-          // Clean up temp file if replacement failed
           try {
             unlinkSync(tempPath);
           } catch {}
           failed++;
         }
       } else {
-        // Clean up temp file if encoding failed
         try {
           unlinkSync(tempPath);
         } catch {}
@@ -159,11 +136,10 @@ function main() {
   }
 
   console.log('\n=== Summary ===');
-  console.log(`Total files: ${mp4Files.length}`);
+  console.log(`Total files: ${videoFiles.length}`);
   console.log(`Processed: ${processed}`);
   console.log(`Skipped (already 480p): ${skipped}`);
   console.log(`Failed: ${failed}`);
 }
 
-// Run the script
 main();
