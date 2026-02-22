@@ -1,14 +1,23 @@
 {
-  "name": "patreon-video-encoder",
-  "version": "1.0.0",
-  "description": "Encode Patreon videos to 480p",
-  "type": "module",
-  "scripts": {
-    "encode": "tsx encode-to-480p.ts"
-  },
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "tsx": "^4.7.0",
-    "typescript": "^5.0.0"
-  }
+    "name": "patreon-video-encoder",
+    "version": "1.0.0",
+    "description": "Encode Patreon videos to 480p",
+    "type": "module",
+    "scripts": {
+        "encode": "tsx encode-to-480p.ts",
+        "test": "vitest run",
+        "lint": "biome check .",
+        "lint:fix": "biome check --write .",
+        "postinstall": "lefthook install"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.4.4",
+        "@types/node": "^20.0.0",
+        "@types/supertest": "^6.0.3",
+        "lefthook": "^2.1.1",
+        "supertest": "^7.2.2",
+        "tsx": "^4.7.0",
+        "typescript": "^5.0.0",
+        "vitest": "^4.0.18"
+    }
 }

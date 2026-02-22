@@ -16,7 +16,9 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 // Image click navigation
 document.addEventListener('click', (e) => {
     if (e.target.classList.contains('post-image-clickable') || e.target.closest('.post-image-clickable')) {
-        const clickedElement = e.target.classList.contains('post-image-clickable') ? e.target : e.target.closest('.post-image-clickable');
+        const clickedElement = e.target.classList.contains('post-image-clickable')
+            ? e.target
+            : e.target.closest('.post-image-clickable');
         const postId = clickedElement.getAttribute('data-post-id');
         if (postId) {
             window.location.href = `/post/${postId}`;

@@ -16,22 +16,18 @@ A Node.js web application for viewing and browsing Patreon posts downloaded with
 
 ## Installation
 
-1. Navigate to the project directory:
+1. From the project root, install all dependencies:
+```bash
+pnpm install
+```
+
+2. Start the server:
 ```bash
 cd patreon-viewer
+pnpm start
 ```
 
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Start the server:
-```bash
-npm start
-```
-
-4. Open your browser and go to `http://localhost:3000`
+3. Open your browser and go to `http://localhost:3000`
 
 ## Usage
 
@@ -48,83 +44,73 @@ npm start
 
 ### API Endpoints
 - GET `/api/posts` - Returns JSON data of all posts with full metadata
-- GET `/media/:postDir/:type/:filename` - Serves media files (attachments, images, embed content)
+- GET `/api/creators` - Returns JSON list of creators with display names
+- GET `/media/:creatorDir/:postDir/:type/:filename` - Serves media files
 
 ## File Structure
 
 The application expects the following directory structure for Patreon posts:
 ```
-posts/
-└── [POST_ID] - [POST_TITLE]/
-    ├── post_info/
-    │   ├── info.txt
-    │   ├── post-api.json
-    │   ├── thumbnail.jpg
-    │   └── cover-image.jpg
-    ├── attachments/
-    │   └── [files...]
-    ├── embed/
-    │   └── [videos...]
-    └── images/
-        └── [images...]
+data/
+└── [CREATOR_DIR]/
+    ├── campaign_info/
+    │   └── info.txt
+    └── posts/
+        └── [POST_ID] - [POST_TITLE]/
+            ├── post_info/
+            │   ├── info.txt
+            │   ├── post-api.json
+            │   ├── thumbnail.jpg
+            │   └── cover-image.jpg
+            ├── attachments/
+            │   └── [files...]
+            ├── embed/
+            │   └── [videos...]
+            └── images/
+                └── [images...]
 ```
+
+## Architecture
+
+The server code is split into testable modules:
+
+- **`lib/helpers.js`** — Pure Handlebars helpers + `parseInfoFile` (no fs deps)
+- **`lib/data.js`** — Data access functions (`resolveImage`, `findPostById`, `readPostData`, `getCreators`), accept `dataDir` param
+- **`lib/app.js`** — `createApp(dataDir)` factory returning an Express app (used by tests with supertest)
+- **`server.js`** — Thin entry point: imports `createApp`, passes `DATA_DIR`, calls `listen`
 
 ## Technologies Used
 
-- **Backend**: Node.js, Express.js
-- **Templating**: Handlebars with express-handlebars
-- **Template Helpers**: handlebars-helpers library + custom helpers
-- **Frontend**: Bootstrap 5, Font Awesome icons
+- **Backend**: Node.js, Express 4, express-handlebars 7
+- **Frontend**: Bootstrap 5.3.0, Font Awesome 6.0.0 (CDN)
 - **File handling**: fs-extra for async file operations
 - **Date formatting**: Moment.js
-- **Styling**: Custom CSS with Bootstrap 5 framework
-
-## Features in Detail
-
-### Post Types Supported
-- Video embeds (YouTube videos)
-- Text posts
-- Posts with attachments
-- Posts with images
-
-### Media Types Handled
-- **Videos**: .webm, .mp4 (playable in modal video player)
-- **Audio**: .mp3, .wav (downloadable with audio icon)
-- **Documents**: .pdf (downloadable with PDF icon)
-- **Guitar Pro**: .gp, .gpx files (downloadable with music icon)
-- **Images**: .jpg, .png, .gif (viewable in fullscreen modal)
-- **Text files**: .txt (viewable in new tab)
-- **Generic files**: All other file types with generic file icon
-
-### Search Capabilities
-- **Real-time search**: Instant filtering as you type
-- **Multi-field search**: Searches across post title, teaser, and post type
-- **Case-insensitive**: Works regardless of text case
-- **Visual feedback**: Posts are shown/hidden dynamically
-
-### Navigation Features
-- **Clickable thumbnails**: Click any post image to navigate to details
-- **Breadcrumb navigation**: Easy navigation back to home page
-- **Direct post links**: Each post has a unique URL `/post/:id`
 
 ## Development
 
 To run in development mode with auto-restart:
 ```bash
-npm run dev
+pnpm run dev
 ```
 
-### Post Metadata Display
-- **Publication dates**: Formatted publication and last edited dates
-- **Engagement stats**: Like counts and comment counts with icons
-- **Post types**: Visual badges indicating video posts, text posts, etc.
-- **Media summary**: Count of attachments, embedded files, and images
-- **Thumbnail status**: Indicators for posts with thumbnails or cover images
+### Testing
 
-## Browser Support
-- Modern browsers with ES6 support
-- Chrome, Firefox, Safari, Edge
-- Bootstrap 5 modal support required for image/video viewing
+From the project root:
+```bash
+pnpm test            # Run all tests
+pnpm lint            # Check linting/formatting
+pnpm lint:fix        # Auto-fix lint/format issues
+```
+
+Tests are in `lib/*.test.mjs` using vitest + supertest.
+
+### Pre-commit Hooks
+
+Lefthook runs `biome check` on staged JS/TS/CSS/JSON files before each commit.
+
+### CI
+
+GitHub Actions runs `pnpm lint` and `pnpm test` on PRs to main.
 
 ## License
 MIT License

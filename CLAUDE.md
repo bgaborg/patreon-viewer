@@ -6,8 +6,12 @@ Offline viewer for legally purchased Patreon content. Two components: a web view
 
 ```
 patreon-view/                         # Root git repo
-├── patreon-viewer/                   # Express web app
-│   ├── server.js                     # Express server, port 3000
+├── patreon-viewer/                   # Express web app (pnpm workspace member)
+│   ├── server.js                     # Thin entry point — imports createApp, calls listen
+│   ├── lib/
+│   │   ├── app.js                    # createApp(dataDir) factory (Express app)
+│   │   ├── data.js                   # Data access (resolveImage, findPostById, readPostData, getCreators)
+│   │   └── helpers.js                # Handlebars helpers + parseInfoFile
 │   ├── views/                        # Handlebars templates
 │   │   ├── layouts/main.handlebars   # Base layout (Bootstrap 5 + Font Awesome CDN)
 │   │   ├── home.handlebars           # Post grid with search + creator filter
@@ -19,7 +23,11 @@ patreon-view/                         # Root git repo
 │   ├── [creator]/campaign_info/      # Creator metadata (info.txt)
 │   ├── .patreon-dl/db.sqlite         # Download tracking database
 │   └── embed.conf                    # yt-dlp / vimeo download config (auth cookies)
-└── .gitignore
+├── biome.json                        # Biome linter/formatter config
+├── lefthook.yml                      # Pre-commit hooks (biome check)
+├── vitest.config.ts                  # Test config (viewer + encoder projects)
+├── pnpm-workspace.yaml               # Workspace: patreon-viewer
+└── .github/workflows/ci.yml          # CI: lint + test on PRs to main
 ```
 
 ## Tech Stack
@@ -27,17 +35,24 @@ patreon-view/                         # Root git repo
 - **Backend:** Node.js, Express 4, express-handlebars 7
 - **Frontend:** Bootstrap 5.3.0, Font Awesome 6.0.0 (both CDN)
 - **Encoding:** TypeScript via tsx, ffmpeg/ffprobe
-- **Package manager:** pnpm (root), npm (patreon-viewer — legacy)
+- **Testing:** Vitest, supertest
+- **Linting/Formatting:** Biome (4-space indent, single quotes, semicolons)
+- **Git hooks:** Lefthook (pre-commit: biome check on staged files)
+- **CI:** GitHub Actions (lint + test on PRs to main)
+- **Package manager:** pnpm (workspace — root + patreon-viewer)
 
 ## Commands
 
 ```bash
-# Root — video encoding
-pnpm run encode                    # Encode MP4s in data/ to 480p
+# Root (use -w to target root workspace)
+pnpm -w test                          # Run all tests (vitest)
+pnpm -w lint                          # Lint + format check (biome)
+pnpm -w lint:fix                      # Auto-fix lint/format issues
+pnpm -w run encode                    # Encode MP4s in data/ to 480p
 
 # patreon-viewer/
-npm start                          # Start server on :3000
-npm run dev                        # Start with nodemon (auto-restart)
+pnpm --filter patreon-post-viewer start   # Start server on :3000
+pnpm --filter patreon-post-viewer dev     # Start with nodemon (auto-restart)
 ```
 
 ## Content Path
@@ -64,9 +79,18 @@ The server reads posts from `../data/*/posts/` relative to `patreon-viewer/`. Cr
 - `GET /post/:id/attachments.zip` — Download all attachments as ZIP
 - `GET /media/:creatorDir/:postDir/:type/:filename` — Serves media files
 
+## Testing
+
+Tests use vitest with two projects configured in `vitest.config.ts`:
+- **viewer** — `patreon-viewer/lib/*.test.mjs` (helper, data, route integration tests)
+- **encoder** — `encode-to-480p.test.ts` (unit tests for is480p, findVideoFiles)
+
+Test files use ESM imports (`.test.mjs` / `.test.ts`) with `createRequire` for CJS source modules.
+
 ## Development Notes
 
-- No test suite exists
+- Pre-commit hook runs `biome check` on staged JS/TS/CSS/JSON files via lefthook
+- CI runs `pnpm lint` and `pnpm test` on PRs to main
 - Server uses `fs-extra` for async filesystem ops, `moment` for date formatting
 - Client JS is vanilla (search filtering, Bootstrap modal management)
 - Video modal clears `<video>` src on close to stop playback
