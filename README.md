@@ -23,9 +23,12 @@ cd patreon-viewer && npm install
 
 ## Usage
 
+All commands below assume you are in the project root (`patreon-view/`).
+
 ### Download content
 
 ```bash
+# From project root
 patreon-dl -C data/embed.conf -o data -y <patreon-url>
 ```
 
@@ -34,6 +37,7 @@ Cookie config lives in `data/embed.conf`. Refresh cookies when they expire.
 ### Encode videos to 480p
 
 ```bash
+# From project root
 pnpm run encode
 ```
 
@@ -42,6 +46,7 @@ Scans `data/` recursively for `.mp4`, `.webm`, `.mkv` files. Skips files already
 ### Start the viewer
 
 ```bash
+# From patreon-viewer/ subdirectory
 cd patreon-viewer
 npm start         # http://localhost:3000
 npm run dev       # with auto-restart (nodemon)
