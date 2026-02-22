@@ -1,0 +1,295 @@
+<div class="row">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/"><i class="fas fa-home"></i> Home</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{post.title}}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            {{#if post.hasThumbnail}}
+            <img src="/media/{{post.creatorDir}}/{{post.dirName}}/post_info/thumbnail.jpg" class="card-img-top" style="height: 300px; object-fit: cover;" alt="{{post.title}}">
+            {{else if post.hasCoverImage}}
+            <img src="/media/{{post.creatorDir}}/{{post.dirName}}/post_info/cover-image.jpg" class="card-img-top" style="height: 300px; object-fit: cover;" alt="{{post.title}}">
+            {{/if}}
+
+            <div class="card-body">
+                <div class="mb-3">
+                    {{#if post.type}}
+                    <span class="badge bg-primary me-2">
+                        {{#eq post.type "video_embed"}}
+                            <i class="fas fa-video me-1"></i>Video Post
+                        {{else}}
+                            <i class="fas fa-file me-1"></i>{{post.type}}
+                        {{/eq}}
+                    </span>
+                    {{/if}}
+
+                    {{#if post.likeCount}}
+                    <span class="badge bg-success me-2">
+                        <i class="fas fa-heart me-1"></i>{{post.likeCount}} likes
+                    </span>
+                    {{/if}}
+
+                    {{#if post.commentCount}}
+                    <span class="badge bg-info me-2">
+                        <i class="fas fa-comment me-1"></i>{{post.commentCount}} comments
+                    </span>
+                    {{/if}}
+                </div>
+
+                <h1 class="card-title">{{post.title}}</h1>
+
+                {{#if post.teaser}}
+                <div class="alert alert-info">
+                    <strong>Teaser:</strong> {{post.teaser}}
+                </div>
+                {{/if}}
+
+                {{#if post.content}}
+                <div class="post-content">
+                    <h5>Content:</h5>
+                    <div class="border p-3 rounded bg-light">
+                        {{{post.content}}}
+                    </div>
+                </div>
+                {{/if}}
+
+                <hr>
+
+                <div class="row text-muted">
+                    {{#if post.published}}
+                    <div class="col-md-6 mb-2">
+                        <i class="fas fa-calendar-plus me-1"></i>
+                        <strong>Published:</strong> {{formatDate post.published}}
+                    </div>
+                    {{/if}}
+
+                    {{#if post.lastEdited}}
+                    <div class="col-md-6 mb-2">
+                        <i class="fas fa-edit me-1"></i>
+                        <strong>Last Edited:</strong> {{formatDate post.lastEdited}}
+                    </div>
+                    {{/if}}
+
+                    {{#if post.id}}
+                    <div class="col-md-6 mb-2">
+                        <i class="fas fa-hashtag me-1"></i>
+                        <strong>Post ID:</strong> {{post.id}}
+                    </div>
+                    {{/if}}
+
+                    {{#if post.url}}
+                    <div class="col-md-6 mb-2">
+                        <i class="fas fa-external-link-alt me-1"></i>
+                        <strong>Original URL:</strong>
+                        <a href="{{post.url}}" target="_blank" class="text-decoration-none">
+                            View on Patreon
+                        </a>
+                    </div>
+                    {{/if}}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Attachments -->
+        {{#if post.attachments.length}}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-paperclip me-2"></i>
+                    Attachments ({{post.attachments.length}})
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="attachment-list">
+                    {{#each post.attachments}}
+                    <div class="d-flex align-items-center mb-2 p-2 border rounded">
+                        {{#if (endsWith this ".pdf")}}
+                            <i class="fas fa-file-pdf text-danger me-2"></i>
+                        {{else if (endsWith this ".mp3")}}
+                            <i class="fas fa-file-audio text-primary me-2"></i>
+                        {{else if (endsWith this ".gp")}}
+                            <i class="fas fa-music text-success me-2"></i>
+                        {{else}}
+                            <i class="fas fa-file text-secondary me-2"></i>
+                        {{/if}}
+                        <span class="flex-grow-1 small">{{this}}</span>
+                        {{#if (endsWith this ".pdf")}}
+                            <a href="/media/{{../post.creatorDir}}/{{../post.dirName}}/attachments/{{this}}"
+                               class="btn btn-sm btn-outline-primary"
+                               target="_blank"
+                               title="Open {{this}}">
+                                <i class="fas fa-external-link-alt"></i>
+                            </a>
+                        {{else}}
+                            <a href="/media/{{../post.creatorDir}}/{{../post.dirName}}/attachments/{{this}}"
+                               class="btn btn-sm btn-outline-primary"
+                               download
+                               title="Download {{this}}">
+                                <i class="fas fa-download"></i>
+                            </a>
+                        {{/if}}
+                    </div>
+                    {{/each}}
+                </div>
+            </div>
+        </div>
+        {{/if}}
+
+        <!-- Embedded Files -->
+        {{#if post.embedFiles.length}}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-play me-2"></i>
+                    Embedded Content ({{post.embedFiles.length}})
+                </h5>
+            </div>
+            <div class="card-body">
+                {{#each post.embedFiles}}
+                <div class="d-flex align-items-center mb-2 p-2 border rounded">
+                    {{#if (endsWith this ".webm")}}
+                        <i class="fas fa-video text-danger me-2"></i>
+                    {{else if (endsWith this ".mp4")}}
+                        <i class="fas fa-video text-danger me-2"></i>
+                    {{else if (endsWith this ".txt")}}
+                        <i class="fas fa-file-text text-info me-2"></i>
+                    {{else}}
+                        <i class="fas fa-file text-secondary me-2"></i>
+                    {{/if}}
+                    <span class="flex-grow-1 small">{{this}}</span>
+                    {{#if (endsWith this ".webm")}}
+                        <button class="btn btn-sm btn-outline-primary"
+                                onclick="showVideo('{{../post.creatorDir}}', '{{../post.dirName}}', '{{this}}')"
+                                title="Play {{this}}">
+                            <i class="fas fa-play"></i>
+                        </button>
+                    {{else}}
+                        <a href="/media/{{../post.creatorDir}}/{{../post.dirName}}/embed/{{this}}"
+                           class="btn btn-sm btn-outline-primary"
+                           target="_blank"
+                           title="View {{this}}">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    {{/if}}
+                </div>
+                {{/each}}
+            </div>
+        </div>
+        {{/if}}
+
+        <!-- Images -->
+        {{#if post.images.length}}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-images me-2"></i>
+                    Images ({{post.images.length}})
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {{#each post.images}}
+                    <div class="col-6 mb-2">
+                        <img src="/media/{{../post.creatorDir}}/{{../post.dirName}}/images/{{this}}"
+                             class="img-fluid rounded"
+                             alt="{{this}}"
+                             onclick="showImageModal('{{../post.creatorDir}}', '{{../post.dirName}}', '{{this}}')"
+                             style="cursor: pointer;">
+                    </div>
+                    {{/each}}
+                </div>
+            </div>
+        </div>
+        {{/if}}
+
+        <!-- Post Metadata -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Post Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {{#if post.hasThumbnail}}
+                    <div class="col-md-12 mb-2">
+                        <span class="badge bg-success me-2">
+                            <i class="fas fa-image me-1"></i>Has Thumbnail
+                        </span>
+                    </div>
+                    {{/if}}
+
+                    {{#if post.hasCoverImage}}
+                    <div class="col-md-12 mb-2">
+                        <span class="badge bg-success me-2">
+                            <i class="fas fa-image me-1"></i>Has Cover Image
+                        </span>
+                    </div>
+                    {{/if}}
+
+                    <div class="col-md-12 mb-2">
+                        <span class="badge bg-{{#if post.attachments.length}}info{{else}}secondary{{/if}} me-2">
+                            <i class="fas fa-paperclip me-1"></i>{{#if post.attachments.length}}{{post.attachments.length}} Attachments{{else}}No Attachments{{/if}}
+                        </span>
+                    </div>
+
+                    <div class="col-md-12 mb-2">
+                        <span class="badge bg-{{#if post.embedFiles.length}}warning{{else}}secondary{{/if}} me-2">
+                            <i class="fas fa-play me-1"></i>{{#if post.embedFiles.length}}{{post.embedFiles.length}} Embedded Files{{else}}No Embedded Files{{/if}}
+                        </span>
+                    </div>
+
+                    <div class="col-md-12 mb-2">
+                        <span class="badge bg-{{#if post.images.length}}primary{{else}}secondary{{/if}}">
+                            <i class="fas fa-images me-1"></i>{{#if post.images.length}}{{post.images.length}} Images{{else}}No Images{{/if}}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Video Modal -->
+<div class="modal fade" id="videoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Video Player</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <video id="videoPlayer" controls class="w-100" style="max-height: 400px;">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Image Viewer</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImage" class="img-fluid" alt="">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/js/post.js"></script>

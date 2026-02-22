@@ -1,0 +1,14 @@
+{
+  "name": "patreon-video-encoder",
+  "version": "1.0.0",
+  "description": "Encode Patreon videos to 480p",
+  "type": "module",
+  "scripts": {
+    "encode": "tsx encode-to-480p.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,30 @@
+# Downloaded Patreon content (posts, media, databases)
+data/
+
+# Dependencies
+node_modules/
+
+# TypeScript build output
+dist/
+
+# OS files
+.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary
+tmp/
+temp/
