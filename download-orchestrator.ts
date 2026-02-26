@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { platform } from 'node:os';
 import { join } from 'node:path';
 import PatreonDownloader from 'patreon-dl';
@@ -22,17 +22,10 @@ export interface EmbedConfSettings {
 export interface DownloadCallbacks {
     abortController?: AbortController;
     onLog?: (type: string, message: string) => void;
-    onProgress?: (progress: DownloadProgress) => void;
     onTargetBegin?: (info: { name: string }) => void;
     onTargetEnd?: (info: { skipped: boolean }) => void;
+    onFileDownloaded?: (filePath: string) => void;
     onEnd?: (payload: EndPayload) => void;
-}
-
-export interface DownloadProgress {
-    filename: string;
-    percent: number;
-    speed: number;
-    sizeDownloaded: number;
 }
 
 export interface EndPayload {
@@ -248,20 +241,14 @@ export async function runDownload(url: string, dataDir: string, callbacks: Downl
                     callbacks.onLog?.('info', `Downloading: ${filename}`);
                 });
 
-                batch.on('taskProgress', (tp: Record<string, unknown>) => {
-                    const progress = tp.progress as Record<string, unknown>;
-                    callbacks.onProgress?.({
-                        filename: progress.destFilename as string,
-                        percent: (progress.percent as number) || 0,
-                        speed: (progress.speed as number) || 0,
-                        sizeDownloaded: (progress.sizeDownloaded as number) || 0,
-                    });
-                });
-
                 batch.on('taskComplete', (tp: Record<string, unknown>) => {
                     const task = tp.task as Record<string, unknown>;
                     const filename = (task.resolvedDestFilename as string) || 'file';
+                    const filePath = task.resolvedDestFilePath as string | null;
                     callbacks.onLog?.('success', `Downloaded: ${filename}`);
+                    if (filePath) {
+                        callbacks.onFileDownloaded?.(filePath);
+                    }
                 });
 
                 batch.on('taskSkip', (tp: Record<string, unknown>) => {
@@ -293,28 +280,6 @@ export async function runDownload(url: string, dataDir: string, callbacks: Downl
     });
 
     await downloader.start({ signal: abortController.signal });
-}
-
-/**
- * Find video files recursively in a directory.
- */
-function findVideoFiles(dir: string): string[] {
-    const videoFiles: string[] = [];
-    try {
-        const entries = readdirSync(dir);
-        for (const entry of entries) {
-            const fullPath = join(dir, entry);
-            const stat = statSync(fullPath);
-            if (stat.isDirectory()) {
-                videoFiles.push(...findVideoFiles(fullPath));
-            } else if (stat.isFile() && VIDEO_EXTENSIONS.some((ext) => entry.toLowerCase().endsWith(ext))) {
-                videoFiles.push(fullPath);
-            }
-        }
-    } catch {
-        // Skip unreadable directories
-    }
-    return videoFiles;
 }
 
 /**
@@ -385,12 +350,19 @@ function encodeFile(inputPath: string, outputPath: string, resolution: VideoReso
 }
 
 /**
- * Find and encode all videos in dataDir that are not already 480p.
+ * Encode only the given video files that are not already 480p.
+ * Only processes files from the downloadedFiles list — never scans the whole directory.
  */
-export async function encodeVideos(dataDir: string, callbacks: EncodeCallbacks): Promise<void> {
-    callbacks.onLog?.('info', 'Scanning for videos to encode...');
+export async function encodeVideos(downloadedFiles: string[], callbacks: EncodeCallbacks): Promise<void> {
+    const videoFiles = downloadedFiles.filter((f) => VIDEO_EXTENSIONS.some((ext) => f.toLowerCase().endsWith(ext)));
 
-    const videoFiles = findVideoFiles(dataDir);
+    if (videoFiles.length === 0) {
+        callbacks.onLog?.('info', 'No downloaded videos to encode');
+        callbacks.onEncodingEnd?.();
+        return;
+    }
+
+    callbacks.onLog?.('info', `Checking ${videoFiles.length} downloaded video(s)...`);
     const toEncode: Array<{ filePath: string; resolution: VideoResolution }> = [];
 
     for (const filePath of videoFiles) {

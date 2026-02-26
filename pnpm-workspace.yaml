@@ -1,2 +1,5 @@
 packages:
   - patreon-viewer
+
+onlyBuiltDependencies:
+  - better-sqlite3

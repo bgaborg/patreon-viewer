@@ -7,7 +7,7 @@ import { findPostById, getCreators, readPostData } from './data.js';
 import { createDownloadRouter } from './download-routes.js';
 import { handlebarsHelpers } from './helpers.js';
 
-const ALLOWED_MEDIA_TYPES = new Set(['post_info', 'attachments', 'embed', 'images']);
+const ALLOWED_MEDIA_TYPES = new Set(['post_info', 'attachments', 'embed', 'images', 'video']);
 
 export function createApp(dataDir: string): Express {
     const app = express();

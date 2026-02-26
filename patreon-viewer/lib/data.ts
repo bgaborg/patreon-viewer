@@ -2,6 +2,12 @@ import path from 'node:path';
 import fs from 'fs-extra';
 import { parseInfoFile } from './helpers.js';
 
+export interface YouTubeEmbed {
+    url: string;
+    videoId: string;
+    title: string;
+}
+
 export interface PostInfo {
     id: string | undefined;
     title: string | undefined;
@@ -15,6 +21,8 @@ export interface PostInfo {
     commentCount: number | undefined;
     attachments: string[];
     embedFiles: string[];
+    youtubeEmbeds: YouTubeEmbed[];
+    videoFiles: string[];
     images: string[];
     hasThumbnail: boolean;
     thumbnailFile: string | null;
@@ -28,6 +36,23 @@ export interface PostInfo {
 export interface Creator {
     dir: string;
     displayName: string;
+}
+
+/**
+ * Extract YouTube video ID from any YouTube URL format:
+ * - youtu.be/ID
+ * - youtube.com/watch?v=ID
+ * - youtube.com/embed/ID
+ * - youtube.com/v/ID
+ * - youtube.com/shorts/ID
+ * - youtube.com/live/ID
+ * - youtube-nocookie.com/embed/ID
+ */
+export function extractYouTubeId(url: string): string | null {
+    const match = url.match(
+        /(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:embed\/|v\/|shorts\/|live\/|watch\?.*v=))([a-zA-Z0-9_-]{11})/,
+    );
+    return match ? match[1] : null;
 }
 
 export async function resolveImage(dir: string, baseName: string): Promise<string | null> {
@@ -79,6 +104,43 @@ async function readSinglePost(
         embedFiles = (await fs.readdir(embedPath)).filter((f: string) => !f.startsWith('.'));
     }
 
+    const youtubeEmbeds: YouTubeEmbed[] = [];
+    const remainingEmbedFiles: string[] = [];
+    for (const file of embedFiles) {
+        if (!file.endsWith('.txt')) {
+            remainingEmbedFiles.push(file);
+            continue;
+        }
+        const content = await fs.readFile(path.join(embedPath, file), 'utf8');
+        const urlMatch = content.match(/^URL:\s*(.*youtu\.?be[^\s]*)/m);
+        if (!urlMatch) {
+            remainingEmbedFiles.push(file);
+            continue;
+        }
+        const ytUrl = urlMatch[1].trim();
+        const videoId = extractYouTubeId(ytUrl);
+        if (!videoId) {
+            remainingEmbedFiles.push(file);
+            continue;
+        }
+        const subjectMatch = content.match(/^Subject:\s*(.+)/m);
+        youtubeEmbeds.push({
+            url: ytUrl,
+            videoId,
+            title: subjectMatch ? subjectMatch[1].trim() : '',
+        });
+    }
+    embedFiles = remainingEmbedFiles;
+
+    const videoPath = path.join(postPath, 'video');
+    let videoFiles: string[] = [];
+    if (await fs.pathExists(videoPath)) {
+        const VIDEO_EXTS = new Set(['.mp4', '.webm', '.mkv']);
+        videoFiles = (await fs.readdir(videoPath)).filter(
+            (f: string) => !f.startsWith('.') && VIDEO_EXTS.has(path.extname(f).toLowerCase()),
+        );
+    }
+
     const imagesPath = path.join(postPath, 'images');
     let images: string[] = [];
     if (await fs.pathExists(imagesPath)) {
@@ -101,6 +163,8 @@ async function readSinglePost(
         commentCount: attributes?.comment_count as number | undefined,
         attachments,
         embedFiles,
+        youtubeEmbeds,
+        videoFiles,
         images,
         hasThumbnail: !!thumbnailPath,
         thumbnailFile: thumbnailPath ? path.basename(thumbnailPath) : null,

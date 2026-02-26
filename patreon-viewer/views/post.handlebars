@@ -41,6 +41,40 @@
 
                 <h1 class="card-title">{{post.title}}</h1>
 
+                {{#if post.videoFiles.length}}
+                {{#each post.videoFiles}}
+                <div class="mb-3">
+                    <video controls style="max-height: 480px; max-width: 100%;" preload="metadata">
+                        <source src="{{encodeMediaPath ../post.creatorDir ../post.dirName "video" this}}" type="video/mp4">
+                    </video>
+                </div>
+                {{/each}}
+                {{/if}}
+
+                {{#if post.youtubeEmbeds.length}}
+                {{#each post.youtubeEmbeds}}
+                <div class="mb-3">
+                    <div class="ratio ratio-16x9">
+                        <iframe src="https://www.youtube.com/embed/{{this.videoId}}"
+                                title="{{this.title}}" allowfullscreen></iframe>
+                    </div>
+                    {{#if this.title}}<small class="text-muted">{{this.title}}</small>{{/if}}
+                </div>
+                {{/each}}
+                {{/if}}
+
+                {{#if post.embedFiles.length}}
+                {{#each post.embedFiles}}
+                {{#if (isVideo this)}}
+                <div class="mb-3">
+                    <video controls style="max-height: 480px; max-width: 100%;" preload="metadata">
+                        <source src="{{encodeMediaPath ../post.creatorDir ../post.dirName "embed" this}}" type="video/mp4">
+                    </video>
+                </div>
+                {{/if}}
+                {{/each}}
+                {{/if}}
+
                 {{#if post.teaser}}
                 <div class="alert alert-info">
                     <strong>Teaser:</strong> {{post.teaser}}
@@ -143,48 +177,6 @@
         </div>
         {{/if}}
 
-        <!-- Embedded Files -->
-        {{#if post.embedFiles.length}}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-play me-2"></i>
-                    Embedded Content ({{post.embedFiles.length}})
-                </h5>
-            </div>
-            <div class="card-body">
-                {{#each post.embedFiles}}
-                <div class="d-flex align-items-center mb-2 p-2 border rounded">
-                    {{#if (isVideo this)}}
-                        <i class="fas fa-video text-danger me-2"></i>
-                    {{else if (endsWith this ".txt")}}
-                        <i class="fas fa-file-text text-info me-2"></i>
-                    {{else}}
-                        <i class="fas fa-file text-secondary me-2"></i>
-                    {{/if}}
-                    <span class="flex-grow-1 small">{{this}}</span>
-                    {{#if (isVideo this)}}
-                        <button class="btn btn-sm btn-outline-primary js-play-video"
-                                data-creator="{{../post.creatorDir}}"
-                                data-post="{{../post.dirName}}"
-                                data-file="{{this}}"
-                                title="Play {{this}}">
-                            <i class="fas fa-play"></i>
-                        </button>
-                    {{else}}
-                        <a href="{{encodeMediaPath ../post.creatorDir ../post.dirName "embed" this}}"
-                           class="btn btn-sm btn-outline-primary"
-                           target="_blank"
-                           title="View {{this}}">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                    {{/if}}
-                </div>
-                {{/each}}
-            </div>
-        </div>
-        {{/if}}
-
         <!-- Images -->
         {{#if post.images.length}}
         <div class="card mb-4">
@@ -256,23 +248,6 @@
                         </span>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Video Modal -->
-<div class="modal fade" id="videoModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Video Player</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <video id="videoPlayer" controls class="w-100" style="max-height: 400px;">
-                    Your browser does not support the video tag.
-                </video>
             </div>
         </div>
     </div>

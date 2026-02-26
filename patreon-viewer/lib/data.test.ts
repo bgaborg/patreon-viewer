@@ -2,7 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'fs-extra';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { findPostById, getCreators, readPostData, resolveImage } from './data.js';
+import { extractYouTubeId, findPostById, getCreators, readPostData, resolveImage } from './data.js';
 
 let tmpDir: string;
 
@@ -125,5 +125,99 @@ describe('readPostData', () => {
         const post = posts.find((p) => p.id === '99001');
         expect(post?.attachments).toContain('doc.pdf');
         expect(post?.images).toContain('photo.jpg');
+    });
+});
+
+describe('youtubeEmbeds', () => {
+    it('parses YouTube embed from embedded-video.txt', async () => {
+        const embedDir = path.join(tmpDir, 'abc123 - Test Creator', 'posts', '99001 - My Test Post', 'embed');
+        await fs.mkdirp(embedDir);
+        await fs.writeFile(
+            path.join(embedDir, 'embedded-video.txt'),
+            [
+                'Embed',
+                '--------',
+                'Type: videoEmbed',
+                'Subject: My Cool Video',
+                'URL: https://youtu.be/DTp3U1Xr2Ls',
+            ].join('\n'),
+        );
+
+        const post = await findPostById(tmpDir, '99001');
+        expect(post?.youtubeEmbeds).toHaveLength(1);
+        expect(post?.youtubeEmbeds[0]).toEqual({
+            url: 'https://youtu.be/DTp3U1Xr2Ls',
+            videoId: 'DTp3U1Xr2Ls',
+            title: 'My Cool Video',
+        });
+        expect(post?.embedFiles).not.toContain('embedded-video.txt');
+    });
+
+    it('parses youtube.com/watch?v= URL format', async () => {
+        const embedDir = path.join(tmpDir, 'abc123 - Test Creator', 'posts', '99001 - My Test Post', 'embed');
+        await fs.mkdirp(embedDir);
+        await fs.writeFile(
+            path.join(embedDir, 'embedded-video.txt'),
+            'Subject: Watch Format\nURL: https://www.youtube.com/watch?v=NWoFUIZds04&t=75s',
+        );
+
+        const post = await findPostById(tmpDir, '99001');
+        expect(post?.youtubeEmbeds).toHaveLength(1);
+        expect(post?.youtubeEmbeds[0].videoId).toBe('NWoFUIZds04');
+    });
+
+    it('keeps non-YouTube txt files in embedFiles', async () => {
+        const embedDir = path.join(tmpDir, 'abc123 - Test Creator', 'posts', '99001 - My Test Post', 'embed');
+        await fs.mkdirp(embedDir);
+        await fs.writeFile(
+            path.join(embedDir, 'embedded-video.txt'),
+            ['Embed', '--------', 'Type: videoEmbed', 'Subject: Vimeo Video', 'URL: https://vimeo.com/123456'].join(
+                '\n',
+            ),
+        );
+
+        const post = await findPostById(tmpDir, '99001');
+        expect(post?.youtubeEmbeds).toHaveLength(0);
+        expect(post?.embedFiles).toContain('embedded-video.txt');
+    });
+
+    it('keeps video files in embedFiles alongside YouTube embeds', async () => {
+        const embedDir = path.join(tmpDir, 'abc123 - Test Creator', 'posts', '99001 - My Test Post', 'embed');
+        await fs.mkdirp(embedDir);
+        await fs.writeFile(path.join(embedDir, 'video.mp4'), 'fake mp4');
+        await fs.writeFile(
+            path.join(embedDir, 'embedded-video.txt'),
+            'Subject: YT Vid\nURL: https://youtu.be/XYZ789abcde',
+        );
+
+        const post = await findPostById(tmpDir, '99001');
+        expect(post?.youtubeEmbeds).toHaveLength(1);
+        expect(post?.embedFiles).toContain('video.mp4');
+        expect(post?.embedFiles).not.toContain('embedded-video.txt');
+    });
+});
+
+describe('extractYouTubeId', () => {
+    it.each([
+        ['https://youtu.be/DTp3U1Xr2Ls', 'DTp3U1Xr2Ls'],
+        ['https://www.youtube.com/watch?v=NWoFUIZds04', 'NWoFUIZds04'],
+        ['https://www.youtube.com/watch?v=NWoFUIZds04&t=75s', 'NWoFUIZds04'],
+        ['https://www.youtube.com/watch?v=rWvRw9JzWHs&list=PLW&index=1', 'rWvRw9JzWHs'],
+        ['https://www.youtube.com/embed/ABC123xyz_-', 'ABC123xyz_-'],
+        ['https://www.youtube-nocookie.com/embed/ABC123xyz_-', 'ABC123xyz_-'],
+        ['https://www.youtube.com/v/DTp3U1Xr2Ls', 'DTp3U1Xr2Ls'],
+        ['https://www.youtube.com/shorts/DTp3U1Xr2Ls', 'DTp3U1Xr2Ls'],
+        ['https://www.youtube.com/live/DTp3U1Xr2Ls', 'DTp3U1Xr2Ls'],
+        ['https://youtube.com/watch?v=DTp3U1Xr2Ls', 'DTp3U1Xr2Ls'],
+    ])('extracts ID from %s', (url, expected) => {
+        expect(extractYouTubeId(url)).toBe(expected);
+    });
+
+    it.each([
+        'https://vimeo.com/123456',
+        'https://example.com/video',
+        'https://notyoutube.com/watch?v=abc',
+    ])('returns null for non-YouTube URL: %s', (url) => {
+        expect(extractYouTubeId(url)).toBeNull();
     });
 });

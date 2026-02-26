@@ -26,7 +26,6 @@ export interface DownloadState {
     error: string | null;
     abortController: AbortController | null;
     log: LogEntry[];
-    progress: Record<string, unknown> | null;
     targets: TargetsState;
     encoding: EncodingState;
     sseClients: Set<Response>;
@@ -37,7 +36,6 @@ export interface StateSnapshot {
     url: string | null;
     error: string | null;
     log: LogEntry[];
-    progress: Record<string, unknown> | null;
     targets: TargetsState;
     encoding: EncodingState;
 }
@@ -49,7 +47,6 @@ function createInitialState(): DownloadState {
         error: null,
         abortController: null,
         log: [],
-        progress: null,
         targets: { total: 0, completed: 0, skipped: 0 },
         encoding: { total: 0, completed: 0, current: null },
         sseClients: new Set(),
@@ -80,7 +77,6 @@ export function reset(): void {
     state.error = null;
     state.abortController = null;
     state.log = [];
-    state.progress = null;
     state.targets = { total: 0, completed: 0, skipped: 0 };
     state.encoding = { total: 0, completed: 0, current: null };
 }
@@ -91,7 +87,6 @@ export function getSnapshot(): StateSnapshot {
         url: state.url,
         error: state.error,
         log: state.log,
-        progress: state.progress,
         targets: { ...state.targets },
         encoding: { ...state.encoding },
     };

@@ -7,7 +7,7 @@ export const PATREON_URL_PATTERN = /^https?:\/\/(www\.)?patreon\.com\/(posts\/|c
 
 interface OrchestratorModule {
     runDownload: (url: string, dataDir: string, callbacks: Record<string, unknown>) => Promise<void>;
-    encodeVideos: (dataDir: string, callbacks: Record<string, unknown>) => Promise<void>;
+    encodeVideos: (downloadedFiles: string[], callbacks: Record<string, unknown>) => Promise<void>;
     parseEmbedConf: (content: string) => Record<string, unknown>;
     writeEmbedConf: (dataDir: string, settings: Record<string, unknown>) => void;
 }
@@ -66,14 +66,11 @@ export function createDownloadRouter(dataDir: string, orchestratorPath?: string)
         (async () => {
             try {
                 const orchestrator = (await import(resolvedOrchestratorPath)) as OrchestratorModule;
+                const downloadedFiles: string[] = [];
 
                 await orchestrator.runDownload(url, dataDir, {
                     abortController: state.abortController,
                     onLog: (type: string, message: string) => addLog(type, message),
-                    onProgress: (progress: Record<string, unknown>) => {
-                        state.progress = progress;
-                        broadcast('progress', progress);
-                    },
                     onTargetBegin: () => {
                         state.targets.total++;
                         broadcast('targets', state.targets);
@@ -82,6 +79,9 @@ export function createDownloadRouter(dataDir: string, orchestratorPath?: string)
                         if (skipped) state.targets.skipped++;
                         else state.targets.completed++;
                         broadcast('targets', state.targets);
+                    },
+                    onFileDownloaded: (filePath: string) => {
+                        downloadedFiles.push(filePath);
                     },
                     onEnd: (payload: { aborted?: boolean; error?: boolean; message?: string }) => {
                         if (payload.aborted) {
@@ -100,11 +100,11 @@ export function createDownloadRouter(dataDir: string, orchestratorPath?: string)
 
                 if (state.status === 'aborted') return;
 
-                // Start encoding phase
+                // Start encoding phase — only encode newly downloaded files
                 state.status = 'encoding';
                 broadcast('status', { status: 'encoding' });
 
-                await orchestrator.encodeVideos(dataDir, {
+                await orchestrator.encodeVideos(downloadedFiles, {
                     onLog: (type: string, message: string) => addLog(type, message),
                     onEncodingStart: (total: number) => {
                         state.encoding.total = total;
