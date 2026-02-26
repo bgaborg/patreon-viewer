@@ -10,22 +10,26 @@ patreon-view/                         # Root git repo
 │   ├── server.ts                     # Thin entry point — imports createApp, calls listen
 │   ├── lib/
 │   │   ├── app.ts                    # createApp(dataDir) factory (Express app)
-│   │   ├── data.ts                   # Data access (resolveImage, findPostById, readPostData, getCreators)
+│   │   ├── data.ts                   # Data access + YouTube embed parsing (extractYouTubeId)
 │   │   ├── helpers.ts                # Handlebars helpers + parseInfoFile
 │   │   ├── download-state.ts         # Download state management + SSE broadcasting
 │   │   └── download-routes.ts        # Download/settings routes + orchestrator integration
 │   ├── views/                        # Handlebars templates
 │   │   ├── layouts/main.handlebars   # Base layout (Bootstrap 5 + Font Awesome CDN)
 │   │   ├── home.handlebars           # Post grid with search + creator filter
-│   │   └── post.handlebars           # Post detail with media modals
-│   └── public/                       # Static assets (styles.css, js/home.js, js/post.js)
+│   │   └── post.handlebars           # Post detail with inline video players
+│   ├── client/                       # Client-side TypeScript (built with esbuild → public/js/)
+│   │   ├── home.ts                   # Search filtering
+│   │   ├── post.ts                   # Image modal management
+│   │   └── download.ts               # Download page SSE + UI
+│   └── public/                       # Static assets (styles.css, built js/ — gitignored)
 ├── download-orchestrator.ts           # Download orchestrator (patreon-dl + video encoding)
 ├── encode-to-480p.ts                 # Batch video encoder (VideoToolbox h264, q:v 65)
 ├── data/                             # All downloaded content (gitignored)
 │   ├── [creator]/posts/              # Downloaded content per creator
 │   ├── [creator]/campaign_info/      # Creator metadata (info.txt)
 │   ├── .patreon-dl/db.sqlite         # Download tracking database
-│   └── embed.conf                    # yt-dlp / vimeo download config (auth cookies)
+│   └── embed.conf                    # Embed downloader config (YouTube=no-op, Vimeo=patreon-dl-vimeo)
 ├── biome.json                        # Biome linter/formatter config
 ├── lefthook.yml                      # Pre-commit hooks (biome check)
 ├── vitest.config.ts                  # Test config (viewer + encoder projects)
@@ -36,7 +40,7 @@ patreon-view/                         # Root git repo
 ## Tech Stack
 
 - **Backend:** Node.js, Express 4, express-handlebars 7, TypeScript (via tsx)
-- **Frontend:** Bootstrap 5.3.0, Font Awesome 6.0.0 (both CDN)
+- **Frontend:** Bootstrap 5.3.0, Font Awesome 6.0.0 (both CDN), TypeScript client (esbuild)
 - **Encoding:** TypeScript via tsx, ffmpeg/ffprobe
 - **Testing:** Vitest, supertest
 - **Linting/Formatting:** Biome (4-space indent, single quotes, semicolons)
@@ -68,7 +72,8 @@ The server reads posts from `../data/*/posts/` relative to `patreon-viewer/`. Cr
 [POST_ID] - [TITLE]/
 ├── post_info/          # info.txt (key:value), post-api.json, thumbnail, cover-image
 ├── attachments/        # PDFs, Guitar Pro files, etc.
-├── embed/              # Downloaded video files
+├── embed/              # Embedded videos (downloaded .mp4/.webm/.mkv + YouTube .txt metadata)
+├── video/              # Uploaded video files (.mp4, .m3u8, thumbnails)
 └── images/             # Post images
 ```
 
@@ -95,9 +100,11 @@ All test files use TypeScript with direct ESM imports.
 - Pre-commit hook runs `biome check` on staged JS/TS/CSS/JSON files via lefthook
 - CI runs `pnpm lint` and `pnpm test` on PRs to main
 - Server uses `fs-extra` for async filesystem ops, `moment` for date formatting
-- Client JS is vanilla (search filtering, Bootstrap modal management)
-- Video modal clears `<video>` src on close to stop playback
-- Encoding script scans `data/` recursively, skips files already at 480p, handles portrait/landscape
+- Client TypeScript in `client/` is bundled with esbuild to `public/js/` (gitignored, built on start/dev)
+- Videos render inline: local files as `<video>` (max-height 480px), YouTube as `<iframe>` (16:9 ratio)
+- YouTube embeds parsed from `embedded-video.txt` via `extractYouTubeId()` (supports all URL formats)
+- YouTube downloads skipped in `embed.conf` (no-op echo); Vimeo still downloaded locally
+- Encoding only processes newly downloaded files (not full directory scan)
 - Creator display names are read from `campaign_info/info.txt` Name field
-- System dependencies: `ffmpeg`, `ffprobe`, `yt-dlp` must be installed
+- System dependencies: `ffmpeg`, `ffprobe` must be installed
 - Run `patreon-dl` from within `data/` directory so artifacts stay contained
