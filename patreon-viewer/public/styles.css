@@ -79,3 +79,61 @@
 .attachment-list::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
+
+/* Download page */
+.download-log {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+    font-size: 0.8rem;
+    max-height: 400px;
+    overflow-y: auto;
+    min-height: 120px;
+}
+
+.download-log-entry {
+    padding: 2px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.download-log-entry .log-time {
+    color: #666;
+    margin-right: 8px;
+}
+
+.download-log-entry.log-info .log-msg {
+    color: #64b5f6;
+}
+
+.download-log-entry.log-success .log-msg {
+    color: #81c784;
+}
+
+.download-log-entry.log-error .log-msg {
+    color: #ef5350;
+}
+
+.download-log-entry.log-warn .log-msg {
+    color: #ffd54f;
+}
+
+.download-log-entry.log-skip .log-msg {
+    color: #999;
+}
+
+.download-log::-webkit-scrollbar {
+    width: 6px;
+}
+
+.download-log::-webkit-scrollbar-track {
+    background: #1a1a2e;
+}
+
+.download-log::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 3px;
+}
+
+.download-log::-webkit-scrollbar-thumb:hover {
+    background: #666;
+}

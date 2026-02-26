@@ -12,6 +12,6 @@
         "outDir": "./dist",
         "rootDir": "."
     },
-    "include": ["*.ts"],
-    "exclude": ["node_modules", "dist"]
+    "include": ["*.ts", "patreon-viewer/**/*.ts"],
+    "exclude": ["node_modules", "dist", "**/node_modules"]
 }

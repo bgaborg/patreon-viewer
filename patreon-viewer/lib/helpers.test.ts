@@ -1,8 +1,5 @@
-import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
-
-const require = createRequire(import.meta.url);
-const { parseInfoFile, handlebarsHelpers } = require('./helpers');
+import { handlebarsHelpers, parseInfoFile } from './helpers.js';
 
 const { formatDate, stripHtml, truncate, postTypeBadge, encodeMediaPath, endsWith, eq, isVideo } = handlebarsHelpers;
 

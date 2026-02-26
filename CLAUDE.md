@@ -7,16 +7,19 @@ Offline viewer for legally purchased Patreon content. Two components: a web view
 ```
 patreon-view/                         # Root git repo
 ├── patreon-viewer/                   # Express web app (pnpm workspace member)
-│   ├── server.js                     # Thin entry point — imports createApp, calls listen
+│   ├── server.ts                     # Thin entry point — imports createApp, calls listen
 │   ├── lib/
-│   │   ├── app.js                    # createApp(dataDir) factory (Express app)
-│   │   ├── data.js                   # Data access (resolveImage, findPostById, readPostData, getCreators)
-│   │   └── helpers.js                # Handlebars helpers + parseInfoFile
+│   │   ├── app.ts                    # createApp(dataDir) factory (Express app)
+│   │   ├── data.ts                   # Data access (resolveImage, findPostById, readPostData, getCreators)
+│   │   ├── helpers.ts                # Handlebars helpers + parseInfoFile
+│   │   ├── download-state.ts         # Download state management + SSE broadcasting
+│   │   └── download-routes.ts        # Download/settings routes + orchestrator integration
 │   ├── views/                        # Handlebars templates
 │   │   ├── layouts/main.handlebars   # Base layout (Bootstrap 5 + Font Awesome CDN)
 │   │   ├── home.handlebars           # Post grid with search + creator filter
 │   │   └── post.handlebars           # Post detail with media modals
 │   └── public/                       # Static assets (styles.css, js/home.js, js/post.js)
+├── download-orchestrator.ts           # Download orchestrator (patreon-dl + video encoding)
 ├── encode-to-480p.ts                 # Batch video encoder (VideoToolbox h264, q:v 65)
 ├── data/                             # All downloaded content (gitignored)
 │   ├── [creator]/posts/              # Downloaded content per creator
@@ -32,7 +35,7 @@ patreon-view/                         # Root git repo
 
 ## Tech Stack
 
-- **Backend:** Node.js, Express 4, express-handlebars 7
+- **Backend:** Node.js, Express 4, express-handlebars 7, TypeScript (via tsx)
 - **Frontend:** Bootstrap 5.3.0, Font Awesome 6.0.0 (both CDN)
 - **Encoding:** TypeScript via tsx, ffmpeg/ffprobe
 - **Testing:** Vitest, supertest
@@ -57,7 +60,7 @@ pnpm --filter patreon-post-viewer dev     # Start with nodemon (auto-restart)
 
 ## Content Path
 
-The server reads posts from `../data/*/posts/` relative to `patreon-viewer/`. Creator content lives in named dirs (e.g., `jenslarsen - Jens Larsen/posts/`). The `DATA_DIR` constant in `server.js` points to `../data`.
+The server reads posts from `../data/*/posts/` relative to `patreon-viewer/`. Creator content lives in named dirs (e.g., `jenslarsen - Jens Larsen/posts/`). The `DATA_DIR` constant in `server.ts` points to `../data`.
 
 ### Expected post directory structure
 
@@ -82,10 +85,10 @@ The server reads posts from `../data/*/posts/` relative to `patreon-viewer/`. Cr
 ## Testing
 
 Tests use vitest with two projects configured in `vitest.config.ts`:
-- **viewer** — `patreon-viewer/lib/*.test.mjs` (helper, data, route integration tests)
-- **encoder** — `encode-to-480p.test.ts` (unit tests for is480p, findVideoFiles)
+- **viewer** — `patreon-viewer/lib/*.test.ts` (helper, data, route integration tests)
+- **encoder** — `*.test.ts` (units for encode-to-480p + download-orchestrator)
 
-Test files use ESM imports (`.test.mjs` / `.test.ts`) with `createRequire` for CJS source modules.
+All test files use TypeScript with direct ESM imports.
 
 ## Development Notes
 

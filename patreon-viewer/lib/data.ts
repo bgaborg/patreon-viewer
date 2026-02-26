@@ -1,8 +1,36 @@
-const fs = require('fs-extra');
-const path = require('node:path');
-const { parseInfoFile } = require('./helpers');
+import path from 'node:path';
+import fs from 'fs-extra';
+import { parseInfoFile } from './helpers.js';
 
-async function resolveImage(dir, baseName) {
+export interface PostInfo {
+    id: string | undefined;
+    title: string | undefined;
+    content: string | undefined;
+    teaser: string | undefined;
+    type: string | undefined;
+    published: string | undefined;
+    lastEdited: string | undefined;
+    url: string | undefined;
+    likeCount: number | undefined;
+    commentCount: number | undefined;
+    attachments: string[];
+    embedFiles: string[];
+    images: string[];
+    hasThumbnail: boolean;
+    thumbnailFile: string | null;
+    hasCoverImage: boolean;
+    coverImageFile: string | null;
+    creatorDir: string;
+    dirName: string;
+    apiData: Record<string, unknown> | undefined;
+}
+
+export interface Creator {
+    dir: string;
+    displayName: string;
+}
+
+export async function resolveImage(dir: string, baseName: string): Promise<string | null> {
     const jpg = path.join(dir, `${baseName}.jpg`);
     if (await fs.pathExists(jpg)) return jpg;
     const webp = path.join(dir, `${baseName}.webp`);
@@ -10,59 +38,67 @@ async function resolveImage(dir, baseName) {
     return null;
 }
 
-async function readSinglePost(_dataDir, creatorDir, postDir, postPath) {
+async function readSinglePost(
+    _dataDir: string,
+    creatorDir: string,
+    postDir: string,
+    postPath: string,
+): Promise<PostInfo> {
     const postInfoPath = path.join(postPath, 'post_info');
 
     const infoFile = path.join(postInfoPath, 'info.txt');
-    let postInfo = {};
+    let postInfo: Record<string, string> = {};
     if (await fs.pathExists(infoFile)) {
         const infoContent = await fs.readFile(infoFile, 'utf8');
         postInfo = parseInfoFile(infoContent);
     }
 
     const apiFile = path.join(postInfoPath, 'post-api.json');
-    let apiData = {};
+    let apiData: Record<string, unknown> = {};
     if (await fs.pathExists(apiFile)) {
         try {
             const apiContent = await fs.readFile(apiFile, 'utf8');
             apiData = JSON.parse(apiContent);
         } catch (e) {
-            console.error(`Invalid JSON in ${apiFile}:`, e.message);
+            console.error(`Invalid JSON in ${apiFile}:`, (e as Error).message);
         }
     }
 
+    const data = apiData.data as Record<string, unknown> | undefined;
+    const attributes = data?.attributes as Record<string, unknown> | undefined;
+
     const attachmentsPath = path.join(postPath, 'attachments');
-    let attachments = [];
+    let attachments: string[] = [];
     if (await fs.pathExists(attachmentsPath)) {
-        attachments = (await fs.readdir(attachmentsPath)).filter((f) => !f.startsWith('.'));
+        attachments = (await fs.readdir(attachmentsPath)).filter((f: string) => !f.startsWith('.'));
     }
 
     const embedPath = path.join(postPath, 'embed');
-    let embedFiles = [];
+    let embedFiles: string[] = [];
     if (await fs.pathExists(embedPath)) {
-        embedFiles = (await fs.readdir(embedPath)).filter((f) => !f.startsWith('.'));
+        embedFiles = (await fs.readdir(embedPath)).filter((f: string) => !f.startsWith('.'));
     }
 
     const imagesPath = path.join(postPath, 'images');
-    let images = [];
+    let images: string[] = [];
     if (await fs.pathExists(imagesPath)) {
-        images = (await fs.readdir(imagesPath)).filter((f) => !f.startsWith('.'));
+        images = (await fs.readdir(imagesPath)).filter((f: string) => !f.startsWith('.'));
     }
 
     const thumbnailPath = await resolveImage(postInfoPath, 'thumbnail');
     const coverImagePath = await resolveImage(postInfoPath, 'cover-image');
 
     return {
-        id: postInfo.ID || apiData.data?.id,
-        title: postInfo.Title || apiData.data?.attributes?.title,
-        content: postInfo.Content || apiData.data?.attributes?.content,
+        id: postInfo.ID || (data?.id as string | undefined),
+        title: postInfo.Title || (attributes?.title as string | undefined),
+        content: postInfo.Content || (attributes?.content as string | undefined),
         teaser: postInfo.Teaser,
-        type: postInfo.Type || apiData.data?.attributes?.post_type,
-        published: postInfo.Published || apiData.data?.attributes?.published_at,
-        lastEdited: postInfo['Last Edited'] || apiData.data?.attributes?.edited_at,
-        url: postInfo.URL || apiData.data?.attributes?.url,
-        likeCount: apiData.data?.attributes?.like_count,
-        commentCount: apiData.data?.attributes?.comment_count,
+        type: postInfo.Type || (attributes?.post_type as string | undefined),
+        published: postInfo.Published || (attributes?.published_at as string | undefined),
+        lastEdited: postInfo['Last Edited'] || (attributes?.edited_at as string | undefined),
+        url: postInfo.URL || (attributes?.url as string | undefined),
+        likeCount: attributes?.like_count as number | undefined,
+        commentCount: attributes?.comment_count as number | undefined,
         attachments,
         embedFiles,
         images,
@@ -72,11 +108,11 @@ async function readSinglePost(_dataDir, creatorDir, postDir, postPath) {
         coverImageFile: coverImagePath ? path.basename(coverImagePath) : null,
         creatorDir,
         dirName: postDir,
-        apiData: apiData.data?.attributes,
+        apiData: attributes as Record<string, unknown> | undefined,
     };
 }
 
-async function findPostById(dataDir, postId) {
+export async function findPostById(dataDir: string, postId: string): Promise<PostInfo | null> {
     const creatorDirs = await fs.readdir(dataDir);
     for (const creatorDir of creatorDirs) {
         if (creatorDir.startsWith('.')) continue;
@@ -94,9 +130,9 @@ async function findPostById(dataDir, postId) {
     return null;
 }
 
-async function readPostData(dataDir, creatorFilter) {
+export async function readPostData(dataDir: string, creatorFilter: string | null): Promise<PostInfo[]> {
     try {
-        const posts = [];
+        const posts: PostInfo[] = [];
         const creatorDirs = await fs.readdir(dataDir);
 
         for (const creatorDir of creatorDirs) {
@@ -119,15 +155,15 @@ async function readPostData(dataDir, creatorFilter) {
                         const post = await readSinglePost(dataDir, creatorDir, postDir, postPath);
                         if (post) posts.push(post);
                     } catch (error) {
-                        console.error(`Error reading post ${postDir}:`, error.message);
+                        console.error(`Error reading post ${postDir}:`, (error as Error).message);
                     }
                 }
             }
         }
 
         posts.sort((a, b) => {
-            const dateA = new Date(a.published || 0);
-            const dateB = new Date(b.published || 0);
+            const dateA = new Date(a.published || 0).getTime();
+            const dateB = new Date(b.published || 0).getTime();
             return dateB - dateA;
         });
 
@@ -138,8 +174,8 @@ async function readPostData(dataDir, creatorFilter) {
     }
 }
 
-async function getCreators(dataDir) {
-    const creators = [];
+export async function getCreators(dataDir: string): Promise<Creator[]> {
+    const creators: Creator[] = [];
     const entries = await fs.readdir(dataDir);
 
     for (const dir of entries) {
@@ -160,5 +196,3 @@ async function getCreators(dataDir) {
 
     return creators;
 }
-
-module.exports = { resolveImage, readSinglePost, findPostById, readPostData, getCreators };

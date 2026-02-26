@@ -1,15 +1,12 @@
-import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import fs from 'fs-extra';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createApp } from './app.js';
 
-const require = createRequire(import.meta.url);
-const fs = require('fs-extra');
-const { createApp } = require('./app');
-
-let tmpDir;
-let app;
+let tmpDir: string;
+let app: ReturnType<typeof createApp>;
 
 beforeAll(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'patreon-app-test-'));
@@ -57,7 +54,7 @@ describe('GET /api/posts', () => {
     it('filters by creator', async () => {
         const res = await request(app).get('/api/posts?creator=abc123%20-%20Test%20Creator');
         expect(res.status).toBe(200);
-        expect(res.body.every((p) => p.creatorDir === 'abc123 - Test Creator')).toBe(true);
+        expect(res.body.every((p: { creatorDir: string }) => p.creatorDir === 'abc123 - Test Creator')).toBe(true);
     });
 
     it('returns empty array for unknown creator', async () => {

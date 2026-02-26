@@ -6,7 +6,7 @@ export default defineConfig({
             {
                 test: {
                     name: 'viewer',
-                    include: ['patreon-viewer/**/*.test.mjs'],
+                    include: ['patreon-viewer/**/*.test.ts'],
                 },
             },
             {

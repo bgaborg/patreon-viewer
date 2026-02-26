@@ -1,13 +1,10 @@
-import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import fs from 'fs-extra';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { findPostById, getCreators, readPostData, resolveImage } from './data.js';
 
-const require = createRequire(import.meta.url);
-const fs = require('fs-extra');
-const { resolveImage, getCreators, findPostById, readPostData } = require('./data');
-
-let tmpDir;
+let tmpDir: string;
 
 beforeEach(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'patreon-test-'));
@@ -89,8 +86,8 @@ describe('findPostById', () => {
     it('finds post by ID', async () => {
         const post = await findPostById(tmpDir, '99001');
         expect(post).not.toBeNull();
-        expect(post.id).toBe('99001');
-        expect(post.title).toBe('My Test Post');
+        expect(post?.id).toBe('99001');
+        expect(post?.title).toBe('My Test Post');
     });
 
     it('returns null for missing ID', async () => {
@@ -126,7 +123,7 @@ describe('readPostData', () => {
     it('includes attachments and images', async () => {
         const posts = await readPostData(tmpDir, null);
         const post = posts.find((p) => p.id === '99001');
-        expect(post.attachments).toContain('doc.pdf');
-        expect(post.images).toContain('photo.jpg');
+        expect(post?.attachments).toContain('doc.pdf');
+        expect(post?.images).toContain('photo.jpg');
     });
 });

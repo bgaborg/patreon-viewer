@@ -1,0 +1,21 @@
+<div class="accordion" id="cookieHelpAccordion">
+    <div class="accordion-item border-0">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed bg-transparent p-0 text-muted small" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#cookieHelpBody">
+                <i class="fas fa-question-circle me-1"></i> How to get your cookie
+            </button>
+        </h2>
+        <div id="cookieHelpBody" class="accordion-collapse collapse" data-bs-parent="#cookieHelpAccordion">
+            <div class="accordion-body px-0 pb-0 small">
+                <ol class="mb-0">
+                    <li>Log into <a href="https://www.patreon.com" target="_blank">Patreon</a> in your browser</li>
+                    <li>Press <kbd>F12</kbd> to open DevTools, go to the <strong>Network</strong> tab, filter by <strong>XHR</strong></li>
+                    <li>Visit any creator page and look for a <code>posts</code> request</li>
+                    <li>Click the request, go to <strong>Headers</strong> tab</li>
+                    <li>Find <strong>Cookie</strong> under Request Headers, right-click and <strong>Copy Value</strong></li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>

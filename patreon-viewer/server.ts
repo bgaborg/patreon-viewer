@@ -1,5 +1,5 @@
-const path = require('node:path');
-const { createApp } = require('./lib/app');
+import path from 'node:path';
+import { createApp } from './lib/app.js';
 
 const PORT = 3000;
 const DATA_DIR = path.resolve(__dirname, '../data');

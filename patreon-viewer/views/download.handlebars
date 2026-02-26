@@ -1,0 +1,225 @@
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card stats-card">
+            <div class="card-body text-center">
+                <h1 class="card-title mb-1">
+                    <i class="fas fa-download me-2"></i>
+                    Add Content
+                </h1>
+                <p class="card-text mb-0">Download Patreon posts and auto-encode videos to 480p</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- URL Form -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form id="downloadForm">
+                    <div class="input-group input-group-lg">
+                        <input type="url" class="form-control" id="urlInput"
+                               placeholder="https://www.patreon.com/c/creator/posts or .../posts/12345"
+                               required>
+                        <button class="btn btn-primary" type="submit" id="downloadBtn">
+                            <i class="fas fa-download me-1"></i> Download
+                        </button>
+                    </div>
+                    <div class="form-text mt-2">
+                        Accepts: creator page URL, single post URL, or collection URL
+                    </div>
+                </form>
+                <div class="mt-2 d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" id="settingsToggle" type="button">
+                        <i class="fas fa-cog me-1"></i> Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Panel -->
+<div class="row mb-3 d-none" id="settingsPanel">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Download Settings</h5>
+            </div>
+            <div class="card-body">
+                <!-- Cookie -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-cookie-bite me-1"></i> Session Cookie
+                    </label>
+                    <div class="input-group">
+                        <input type="password" class="form-control font-monospace small" id="cookieInput"
+                               placeholder="Paste your Patreon cookie here...">
+                        <button class="btn btn-outline-secondary" type="button" id="cookieRevealBtn" title="Show/hide cookie">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="mt-2">
+                        {{> cookie-help}}
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Download Filters -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-filter me-1"></i> Download Filters
+                    </label>
+
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="filterAttachmentOnly" checked>
+                        <label class="form-check-label" for="filterAttachmentOnly">
+                            Only posts with attachments
+                        </label>
+                    </div>
+
+                    <div id="mediaTypeFilters" class="ms-4 d-none">
+                        <small class="text-muted d-block mb-1">Include posts with:</small>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="mediaAttachment" value="attachment" checked>
+                            <label class="form-check-label" for="mediaAttachment">Attachments</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="mediaVideo" value="video">
+                            <label class="form-check-label" for="mediaVideo">Video</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="mediaAudio" value="audio">
+                            <label class="form-check-label" for="mediaAudio">Audio</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="mediaImage" value="image">
+                            <label class="form-check-label" for="mediaImage">Images</label>
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch mb-2 mt-2">
+                        <input class="form-check-input" type="checkbox" id="filterLockedContent" checked>
+                        <label class="form-check-label" for="filterLockedContent">
+                            Include locked content
+                        </label>
+                    </div>
+
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="filterPreviewMedia" checked>
+                        <label class="form-check-label" for="filterPreviewMedia">
+                            Include preview media
+                        </label>
+                    </div>
+
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="filterComments">
+                        <label class="form-check-label" for="filterComments">
+                            Include comments
+                        </label>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Embed Downloaders (read-only) -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-film me-1"></i> Embed Downloaders
+                    </label>
+                    <div id="embedDownloadersDisplay" class="small text-muted">
+                        Loading...
+                    </div>
+                </div>
+
+                <button class="btn btn-success" id="saveSettingsBtn" type="button">
+                    <i class="fas fa-save me-1"></i> Save Settings
+                </button>
+                <span class="ms-2 small text-muted d-none" id="settingsSaveStatus"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status Card -->
+<div class="row mb-3 d-none" id="statusCard">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <span class="badge fs-6" id="statusBadge">Idle</span>
+                        <span class="ms-2 text-muted small" id="statusUrl"></span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger d-none" id="abortBtn">
+                        <i class="fas fa-stop me-1"></i> Abort
+                    </button>
+                </div>
+
+                <!-- Download Progress -->
+                <div class="mb-3 d-none" id="downloadProgressSection">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span id="progressFilename" class="text-truncate me-2"></span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated"
+                             id="downloadProgressBar" style="width: 0%"></div>
+                    </div>
+                    <div class="small text-muted mt-1" id="progressSpeed"></div>
+                </div>
+
+                <!-- Encoding Progress -->
+                <div class="mb-3 d-none" id="encodingProgressSection">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>Encoding: <span id="encodingCurrent"></span></span>
+                        <span id="encodingCount">0/0</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-warning progress-bar-striped progress-bar-animated"
+                             id="encodingProgressBar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Target Stats -->
+                <div class="row text-center" id="targetStats">
+                    <div class="col-4">
+                        <div class="small text-muted">Total</div>
+                        <div class="fw-bold" id="targetTotal">0</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">Completed</div>
+                        <div class="fw-bold text-success" id="targetCompleted">0</div>
+                    </div>
+                    <div class="col-4">
+                        <div class="small text-muted">Skipped</div>
+                        <div class="fw-bold text-secondary" id="targetSkipped">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activity Log -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-terminal me-2"></i>Activity Log</h5>
+                <span class="badge bg-secondary" id="logCount">0</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="download-log" id="activityLog">
+                    <div class="text-muted p-3 text-center small" id="logPlaceholder">
+                        Waiting for activity...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/js/download.js"></script>

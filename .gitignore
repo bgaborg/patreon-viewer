@@ -6,6 +6,12 @@ node_modules/
 
 # TypeScript build output
 dist/
+*.js
+*.mjs
+*.d.ts
+*.js.map
+!patreon-viewer/public/js/*.js
+!patreon-viewer/lib/global.d.ts
 
 # OS files
 .DS_Store
