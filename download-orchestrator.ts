@@ -209,12 +209,22 @@ export async function runDownload(url: string, dataDir: string, callbacks: Downl
         callbacks.onLog?.('info', `Fetching ${payload.targetType} data...`);
     });
 
-    downloader.on('targetBegin', (payload: { target: { attributes?: { title?: string; name?: string } } }) => {
-        const target = payload.target;
-        const name = target?.attributes?.title || target?.attributes?.name || 'Unknown';
-        callbacks.onLog?.('info', `Processing: ${name}`);
-        callbacks.onTargetBegin?.({ name });
-    });
+    downloader.on(
+        'targetBegin',
+        (payload: { target: { type: string; id?: string; name?: string; title?: string | null } }) => {
+            const target = payload.target;
+            let label: string;
+            if (target.type === 'campaign') {
+                label = target.name || `Campaign #${target.id}`;
+            } else if (target.type === 'collection') {
+                label = target.title || `Collection #${target.id}`;
+            } else {
+                label = target.title || `Post #${target.id}`;
+            }
+            callbacks.onLog?.('info', `Processing ${target.type}: ${label}`);
+            callbacks.onTargetBegin?.({ name: label });
+        },
+    );
 
     downloader.on('targetEnd', (payload: { isSkipped: boolean; skipMessage?: string }) => {
         if (payload.isSkipped) {
