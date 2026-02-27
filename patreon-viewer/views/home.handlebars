@@ -6,7 +6,7 @@
                     <i class="fas fa-guitar me-2"></i>
                     Patreon Posts
                 </h1>
-                <p class="card-text fs-5">
+                <p class="card-text fs-5" id="postCountDisplay">
                     <i class="fas fa-file-alt me-2"></i>
                     Total Posts: <strong>{{totalPosts}}</strong>
                 </p>
@@ -28,6 +28,11 @@
                     {{/each}}
                 </select>
                 {{/if}}
+                <select class="form-select" id="pageSizeSelect" style="width: auto;">
+                    <option value="24">24 / page</option>
+                    <option value="60">60 / page</option>
+                    <option value="90">90 / page</option>
+                </select>
                 <div class="input-group" style="width: 300px;">
                     <input type="text" class="form-control" id="searchInput" placeholder="Search posts...">
                     <span class="input-group-text">
@@ -120,6 +125,8 @@
     </div>
     {{/each}}
 </div>
+
+<div id="paginationContainer" class="mt-4 mb-3"></div>
 
 {{#unless posts.length}}
 <div class="text-center py-5">
