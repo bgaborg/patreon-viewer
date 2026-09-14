@@ -336,18 +336,8 @@ els.saveSettingsBtn.addEventListener('click', async () => {
     if (!els.filterPreviewMedia.checked) include['preview.media'] = 'false';
     if (els.filterComments.checked) include.comments = 'true';
 
-    let embedDownloaders: EmbedDownloader[] = [];
-    try {
-        const currentRes = await fetch('/download/settings');
-        const current: Settings = await currentRes.json();
-        embedDownloaders = current.embedDownloaders || [];
-    } catch {
-        /* ignore */
-    }
-
-    const settings: Settings = {
+    const settings = {
         cookie: els.cookieInput.value,
-        embedDownloaders,
         include,
     };
 

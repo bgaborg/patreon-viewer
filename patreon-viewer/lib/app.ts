@@ -9,6 +9,11 @@ import { handlebarsHelpers } from './helpers.js';
 
 const ALLOWED_MEDIA_TYPES = new Set(['post_info', 'attachments', 'embed', 'images', 'video']);
 
+export function isPathInside(root: string, target: string): boolean {
+    const rel = path.relative(path.resolve(root), path.resolve(target));
+    return rel !== '' && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
+}
+
 export function createApp(dataDir: string): Express {
     const app = express();
 
@@ -133,9 +138,11 @@ export function createApp(dataDir: string): Express {
             return;
         }
 
-        const filePath = path.resolve(dataDir, creatorDir, 'posts', postDir, type, filename);
+        const dataRoot = path.resolve(dataDir);
+        const mediaRoot = path.resolve(dataRoot, creatorDir, 'posts', postDir, type);
+        const filePath = path.resolve(mediaRoot, filename);
 
-        if (!filePath.startsWith(path.resolve(dataDir))) {
+        if (!isPathInside(mediaRoot, filePath) || !isPathInside(dataRoot, filePath)) {
             res.status(403).send('Forbidden');
             return;
         }

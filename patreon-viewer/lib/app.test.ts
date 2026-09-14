@@ -3,7 +3,7 @@ import path from 'node:path';
 import fs from 'fs-extra';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createApp } from './app.js';
+import { createApp, isPathInside } from './app.js';
 
 let tmpDir: string;
 let app: ReturnType<typeof createApp>;
@@ -109,7 +109,27 @@ describe('GET /media/:creatorDir/:postDir/:type/:filename', () => {
 
     it('blocks path traversal with 403', async () => {
         const res = await request(app).get('/media/..%2F..%2Fetc/passwd/images/file.jpg');
-        // Either 403 (traversal blocked) or 404 (doesn't exist) is acceptable
         expect([403, 404]).toContain(res.status);
+    });
+
+    it('blocks filename traversal to embed.conf', async () => {
+        await fs.writeFile(path.join(tmpDir, 'embed.conf'), 'cookie = secret');
+        const res = await request(app).get(
+            `/media/${encodeURIComponent('abc123 - Test Creator')}/${encodeURIComponent('99001 - My Test Post')}/images/${encodeURIComponent('../../../../embed.conf')}`,
+        );
+        expect(res.status).toBe(403);
+        expect(res.text).not.toContain('secret');
+    });
+});
+
+describe('isPathInside', () => {
+    it('allows a file inside the root', () => {
+        expect(isPathInside('/data/posts/p/images', '/data/posts/p/images/photo.jpg')).toBe(true);
+    });
+
+    it('rejects parent and sibling paths', () => {
+        expect(isPathInside('/data/posts/p/images', '/data/embed.conf')).toBe(false);
+        expect(isPathInside('/data', '/data-evil/secret')).toBe(false);
+        expect(isPathInside('/data', '/data')).toBe(false);
     });
 });

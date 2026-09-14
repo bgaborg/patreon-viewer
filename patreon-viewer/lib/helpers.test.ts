@@ -15,6 +15,10 @@ describe('formatDate', () => {
     it('returns empty string for empty string', () => {
         expect(formatDate('')).toBe('');
     });
+
+    it('returns empty string for invalid date', () => {
+        expect(formatDate('not-a-date')).toBe('');
+    });
 });
 
 describe('stripHtml', () => {
@@ -129,6 +133,23 @@ describe('isVideo', () => {
 
     it('returns false for null', () => {
         expect(isVideo(null)).toBe(false);
+    });
+});
+
+describe('videoMime', () => {
+    const { videoMime } = handlebarsHelpers;
+
+    it('returns webm mime', () => {
+        expect(videoMime('clip.webm')).toBe('video/webm');
+    });
+
+    it('returns mkv mime', () => {
+        expect(videoMime('clip.mkv')).toBe('video/x-matroska');
+    });
+
+    it('defaults to mp4', () => {
+        expect(videoMime('clip.mp4')).toBe('video/mp4');
+        expect(videoMime(null)).toBe('video/mp4');
     });
 });
 

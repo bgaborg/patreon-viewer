@@ -1,5 +1,3 @@
-import moment from 'moment';
-
 export interface ParsedInfo {
     [key: string]: string;
 }
@@ -28,7 +26,12 @@ interface HandlebarsBlockOptions {
 }
 
 export const handlebarsHelpers = {
-    formatDate: (dateString: string | null): string => (dateString ? moment(dateString).format('MMMM DD, YYYY') : ''),
+    formatDate: (dateString: string | null): string => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        if (Number.isNaN(date.getTime())) return '';
+        return date.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' });
+    },
     stripHtml: (html: string | null): string => (html || '').replace(/<[^>]*>/g, ''),
     truncate: (str: string | null, length: number): string => {
         if (!str) return '';
@@ -67,5 +70,12 @@ export const handlebarsHelpers = {
         if (!filename) return false;
         const lower = filename.toLowerCase();
         return lower.endsWith('.mp4') || lower.endsWith('.webm') || lower.endsWith('.mkv');
+    },
+    videoMime: (filename: string | null): string => {
+        if (!filename) return 'video/mp4';
+        const lower = filename.toLowerCase();
+        if (lower.endsWith('.webm')) return 'video/webm';
+        if (lower.endsWith('.mkv')) return 'video/x-matroska';
+        return 'video/mp4';
     },
 };

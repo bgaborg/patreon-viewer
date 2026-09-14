@@ -1,7 +1,7 @@
 import path from 'node:path';
 import express, { type Request, type Response, type Router } from 'express';
 import fs from 'fs-extra';
-import { addLog, broadcast, getSnapshot, reset, state } from './download-state.js';
+import { addLog, broadcast, finishJob, getSnapshot, reset, state } from './download-state.js';
 
 export const PATREON_URL_PATTERN = /^https?:\/\/(www\.)?patreon\.com\/(posts\/|collection\/|[^/]+\/?$)/;
 
@@ -49,7 +49,12 @@ export function createDownloadRouter(dataDir: string, orchestratorPath?: string)
             return;
         }
 
-        if (state.status !== 'idle' && state.status !== 'complete' && state.status !== 'error') {
+        if (
+            state.status !== 'idle' &&
+            state.status !== 'complete' &&
+            state.status !== 'error' &&
+            state.status !== 'aborted'
+        ) {
             res.status(409).json({ error: 'A download is already in progress.' });
             return;
         }
@@ -85,26 +90,30 @@ export function createDownloadRouter(dataDir: string, orchestratorPath?: string)
                     },
                     onEnd: (payload: { aborted?: boolean; error?: boolean; message?: string }) => {
                         if (payload.aborted) {
-                            state.status = 'aborted';
+                            finishJob('aborted');
                             broadcast('status', { status: 'aborted' });
                             return;
                         }
                         if (payload.error) {
-                            state.status = 'error';
-                            state.error = payload.message || null;
+                            finishJob('error', payload.message || null);
                             broadcast('status', { status: 'error', error: payload.message });
-                            return;
                         }
                     },
                 });
 
-                if (state.status === 'aborted') return;
+                if (state.status === 'aborted' || state.status === 'error' || state.status === 'aborting') {
+                    if (state.status === 'aborting') {
+                        finishJob('aborted');
+                        broadcast('status', { status: 'aborted' });
+                    }
+                    return;
+                }
 
-                // Start encoding phase — only encode newly downloaded files
                 state.status = 'encoding';
                 broadcast('status', { status: 'encoding' });
 
                 await orchestrator.encodeVideos(downloadedFiles, {
+                    abortController: state.abortController,
                     onLog: (type: string, message: string) => addLog(type, message),
                     onEncodingStart: (total: number) => {
                         state.encoding.total = total;
@@ -122,12 +131,28 @@ export function createDownloadRouter(dataDir: string, orchestratorPath?: string)
                     },
                 });
 
-                state.status = 'complete';
+                if (state.status === 'aborting' || state.abortController?.signal.aborted) {
+                    finishJob('aborted');
+                    broadcast('status', { status: 'aborted' });
+                    addLog('warn', 'Encoding aborted');
+                    return;
+                }
+
+                finishJob('complete');
                 broadcast('status', { status: 'complete' });
                 addLog('success', 'All done!');
             } catch (err) {
-                state.status = 'error';
-                state.error = (err as Error).message;
+                if (
+                    state.status === 'aborting' ||
+                    state.status === 'aborted' ||
+                    state.abortController?.signal.aborted
+                ) {
+                    finishJob('aborted');
+                    addLog('warn', 'Download aborted');
+                    broadcast('status', { status: 'aborted' });
+                    return;
+                }
+                finishJob('error', (err as Error).message);
                 addLog('error', `Fatal error: ${(err as Error).message}`);
                 broadcast('status', { status: 'error', error: (err as Error).message });
             }
@@ -135,7 +160,7 @@ export function createDownloadRouter(dataDir: string, orchestratorPath?: string)
     });
 
     router.post('/download/abort', (_req: Request, res: Response) => {
-        if (!state.abortController || state.status === 'idle') {
+        if (!state.abortController || (state.status !== 'downloading' && state.status !== 'encoding')) {
             res.status(400).json({ error: 'No active download to abort.' });
             return;
         }

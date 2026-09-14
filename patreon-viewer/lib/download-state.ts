@@ -55,6 +55,12 @@ function createInitialState(): DownloadState {
 
 export const state: DownloadState = createInitialState();
 
+export function finishJob(status: 'complete' | 'error' | 'aborted', error?: string | null): void {
+    state.status = status;
+    state.abortController = null;
+    if (error !== undefined) state.error = error;
+}
+
 export function broadcast(event: string, data: unknown): void {
     const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const client of state.sseClients) {
