@@ -120,6 +120,18 @@ describe('readPostData', () => {
         expect(filtered.every((p) => p.creatorDir === 'abc123 - Test Creator')).toBe(true);
     });
 
+    it('sorts invalid published dates last', async () => {
+        const badDir = path.join(tmpDir, 'abc123 - Test Creator', 'posts', '99003 - Bad Date');
+        await fs.mkdirp(path.join(badDir, 'post_info'));
+        await fs.writeFile(
+            path.join(badDir, 'post_info', 'info.txt'),
+            'ID: 99003\nTitle: Bad Date\nPublished: not-a-date',
+        );
+
+        const posts = await readPostData(tmpDir, null);
+        expect(posts.map((p) => p.id)).toEqual(['99002', '99001', '99003']);
+    });
+
     it('includes attachments and images', async () => {
         const posts = await readPostData(tmpDir, null);
         const post = posts.find((p) => p.id === '99001');

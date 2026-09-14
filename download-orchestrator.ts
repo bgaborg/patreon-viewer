@@ -1,10 +1,14 @@
-import { spawn } from 'node:child_process';
-import { readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { platform } from 'node:os';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import PatreonDownloader from 'patreon-dl';
-
-const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mkv'];
+import {
+    encodeFileInPlace,
+    getVideoResolution,
+    is480p,
+    isTempEncodeFile,
+    isVideoFile,
+    type VideoResolution,
+} from './video-encode.js';
 
 export interface EmbedDownloader {
     provider: string;
@@ -35,15 +39,11 @@ export interface EndPayload {
 }
 
 export interface EncodeCallbacks {
+    abortController?: AbortController;
     onLog?: (type: string, message: string) => void;
     onEncodingStart?: (total: number) => void;
     onEncodingProgress?: (progress: { current: string | null; completed: number; total: number }) => void;
     onEncodingEnd?: () => void;
-}
-
-export interface VideoResolution {
-    width: number;
-    height: number;
 }
 
 /**
@@ -98,10 +98,24 @@ export function parseEmbedConf(content: string): EmbedConfSettings {
  * Serialize structured settings back to INI-format embed.conf.
  */
 export function writeEmbedConf(dataDir: string, settings: Partial<EmbedConfSettings>): void {
+    let existing: EmbedConfSettings | null = null;
+    try {
+        existing = parseEmbedConf(readFileSync(join(dataDir, 'embed.conf'), 'utf8'));
+    } catch {
+        /* no existing conf */
+    }
+
+    const merged: EmbedConfSettings = {
+        cookie: settings.cookie ?? existing?.cookie ?? '',
+        embedDownloaders: settings.embedDownloaders ?? existing?.embedDownloaders ?? [],
+        include: settings.include ?? existing?.include ?? {},
+        outDir: settings.outDir ?? existing?.outDir ?? null,
+    };
+
     const lines: string[] = [];
 
-    if (settings.embedDownloaders?.length) {
-        for (const dl of settings.embedDownloaders) {
+    if (merged.embedDownloaders.length) {
+        for (const dl of merged.embedDownloaders) {
             lines.push(`[embed.downloader.${dl.provider}]`);
             for (const [key, value] of Object.entries(dl)) {
                 if (key === 'provider') continue;
@@ -112,17 +126,17 @@ export function writeEmbedConf(dataDir: string, settings: Partial<EmbedConfSetti
     }
 
     lines.push('[downloader]');
-    if (settings.cookie) {
-        lines.push(`cookie = ${settings.cookie}`);
+    if (merged.cookie) {
+        lines.push(`cookie = ${merged.cookie}`);
     }
-    if (settings.outDir) {
-        lines.push(`out.dir = ${settings.outDir}`);
+    if (merged.outDir) {
+        lines.push(`out.dir = ${merged.outDir}`);
     }
     lines.push('');
 
-    if (settings.include && Object.keys(settings.include).length > 0) {
+    if (Object.keys(merged.include).length > 0) {
         lines.push('[include]');
-        for (const [key, value] of Object.entries(settings.include)) {
+        for (const [key, value] of Object.entries(merged.include)) {
             lines.push(`${key} = ${value}`);
         }
         lines.push('');
@@ -292,79 +306,9 @@ export async function runDownload(url: string, dataDir: string, callbacks: Downl
     await downloader.start({ signal: abortController.signal });
 }
 
-/**
- * Get video resolution via ffprobe.
- */
-function getVideoResolution(filePath: string): Promise<VideoResolution | null> {
-    return new Promise((resolve) => {
-        const proc = spawn('ffprobe', [
-            '-v',
-            'error',
-            '-select_streams',
-            'v:0',
-            '-show_entries',
-            'stream=width,height',
-            '-of',
-            'csv=s=x:p=0',
-            filePath,
-        ]);
-        let output = '';
-        proc.stdout.on('data', (d: Buffer) => {
-            output += d;
-        });
-        proc.on('close', (code: number | null) => {
-            if (code !== 0) return resolve(null);
-            const [w, h] = output.trim().split('x').map(Number);
-            if (w && h) resolve({ width: w, height: h });
-            else resolve(null);
-        });
-        proc.on('error', () => resolve(null));
-    });
-}
-
-/**
- * Check if resolution is already 480p.
- */
-function is480p(resolution: VideoResolution): boolean {
-    return Math.min(resolution.width, resolution.height) === 480;
-}
-
-/**
- * Encode a single video to 480p. Returns a promise.
- */
-function encodeFile(inputPath: string, outputPath: string, resolution: VideoResolution): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-        const isPortrait = resolution.height > resolution.width;
-        const scaleFilter = isPortrait ? 'scale=480:-2' : 'scale=-2:480';
-        const videoCodec = platform() === 'darwin' ? ['h264_videotoolbox', '-q:v', '65'] : ['libx264', '-crf', '23'];
-
-        const proc = spawn('ffmpeg', [
-            '-i',
-            inputPath,
-            '-vf',
-            scaleFilter,
-            '-c:v',
-            ...videoCodec,
-            '-c:a',
-            'copy',
-            '-y',
-            outputPath,
-        ]);
-
-        proc.on('close', (code: number | null) => {
-            if (code === 0) resolve(true);
-            else reject(new Error(`ffmpeg exited with code ${code}`));
-        });
-        proc.on('error', reject);
-    });
-}
-
-/**
- * Encode only the given video files that are not already 480p.
- * Only processes files from the downloadedFiles list — never scans the whole directory.
- */
 export async function encodeVideos(downloadedFiles: string[], callbacks: EncodeCallbacks): Promise<void> {
-    const videoFiles = downloadedFiles.filter((f) => VIDEO_EXTENSIONS.some((ext) => f.toLowerCase().endsWith(ext)));
+    const signal = callbacks.abortController?.signal;
+    const videoFiles = downloadedFiles.filter((f) => isVideoFile(f) && !isTempEncodeFile(f));
 
     if (videoFiles.length === 0) {
         callbacks.onLog?.('info', 'No downloaded videos to encode');
@@ -376,9 +320,7 @@ export async function encodeVideos(downloadedFiles: string[], callbacks: EncodeC
     const toEncode: Array<{ filePath: string; resolution: VideoResolution }> = [];
 
     for (const filePath of videoFiles) {
-        // Skip temp encoding files
-        if (filePath.includes('.encoding.')) continue;
-
+        signal?.throwIfAborted();
         const resolution = await getVideoResolution(filePath);
         if (!resolution) continue;
         if (is480p(resolution)) continue;
@@ -397,41 +339,19 @@ export async function encodeVideos(downloadedFiles: string[], callbacks: EncodeC
     let completed = 0;
 
     for (const { filePath, resolution } of toEncode) {
+        signal?.throwIfAborted();
         const filename = filePath.split('/').pop() || '';
         callbacks.onLog?.('info', `Encoding: ${filename}`);
         callbacks.onEncodingProgress?.({ current: filename, completed, total: toEncode.length });
 
-        const outputPath = filePath.replace(/\.(mp4|webm|mkv)$/i, '.mp4');
-        const tempPath = filePath.replace(/\.(mp4|webm|mkv)$/i, '.encoding.mp4');
-        const isFormatConversion = filePath !== outputPath;
-
         try {
-            await encodeFile(filePath, tempPath, resolution);
-            if (isFormatConversion) {
-                try {
-                    unlinkSync(outputPath);
-                } catch {
-                    /* ignore */
-                }
-            }
-            renameSync(tempPath, outputPath);
-            if (isFormatConversion) {
-                try {
-                    unlinkSync(filePath);
-                } catch {
-                    /* ignore */
-                }
-            }
+            await encodeFileInPlace(filePath, resolution, signal);
             completed++;
             callbacks.onLog?.('success', `Encoded: ${filename}`);
             callbacks.onEncodingProgress?.({ current: null, completed, total: toEncode.length });
         } catch (err) {
+            if (signal?.aborted) throw err;
             callbacks.onLog?.('error', `Failed to encode ${filename}: ${(err as Error).message}`);
-            try {
-                unlinkSync(tempPath);
-            } catch {
-                /* ignore */
-            }
         }
     }
 

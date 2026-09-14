@@ -45,7 +45,7 @@
                 {{#each post.videoFiles}}
                 <div class="mb-3">
                     <video controls style="max-height: 480px; max-width: 100%;" preload="metadata">
-                        <source src="{{encodeMediaPath ../post.creatorDir ../post.dirName "video" this}}" type="video/mp4">
+                        <source src="{{encodeMediaPath ../post.creatorDir ../post.dirName "video" this}}" type="{{videoMime this}}">
                     </video>
                 </div>
                 {{/each}}
@@ -68,7 +68,7 @@
                 {{#if (isVideo this)}}
                 <div class="mb-3">
                     <video controls style="max-height: 480px; max-width: 100%;" preload="metadata">
-                        <source src="{{encodeMediaPath ../post.creatorDir ../post.dirName "embed" this}}" type="video/mp4">
+                        <source src="{{encodeMediaPath ../post.creatorDir ../post.dirName "embed" this}}" type="{{videoMime this}}">
                     </video>
                 </div>
                 {{/if}}

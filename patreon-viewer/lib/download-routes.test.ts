@@ -141,6 +141,38 @@ describe('POST /download/abort', () => {
         expect(res.body.ok).toBe(true);
         expect(state.status).toBe('aborting');
     });
+
+    it('returns 400 if download already completed', async () => {
+        state.status = 'complete';
+        state.abortController = new AbortController();
+
+        const res = await request(app).post('/download/abort');
+        expect(res.status).toBe(400);
+    });
+});
+
+describe('download state machine', () => {
+    it('allows a new start after abort', async () => {
+        state.status = 'aborted';
+
+        const res = await request(app)
+            .post('/download/start')
+            .send({ url: 'https://www.patreon.com/posts/my-post-12345' })
+            .set('Content-Type', 'application/json');
+        expect(res.status).toBe(200);
+        expect(res.body.ok).toBe(true);
+    });
+
+    it('rejects start while aborting', async () => {
+        state.status = 'aborting';
+        state.abortController = new AbortController();
+
+        const res = await request(app)
+            .post('/download/start')
+            .send({ url: 'https://www.patreon.com/posts/my-post-12345' })
+            .set('Content-Type', 'application/json');
+        expect(res.status).toBe(409);
+    });
 });
 
 describe('GET /download/settings', () => {

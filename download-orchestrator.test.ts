@@ -112,6 +112,39 @@ describe('writeEmbedConf', () => {
         expect(content).toContain('exec = yt-dlp "{embed.url}"');
     });
 
+    it('preserves embed downloaders when omitted from save', () => {
+        writeEmbedConf(tmpDir, {
+            cookie: 'session=abc',
+            embedDownloaders: [{ provider: 'vimeo', exec: 'patreon-dl-vimeo' }],
+            include: {},
+        });
+        writeEmbedConf(tmpDir, {
+            cookie: 'session=abc',
+            include: {},
+        });
+
+        const parsed = parseEmbedConf(readFileSync(join(tmpDir, 'embed.conf'), 'utf8'));
+        expect(parsed.embedDownloaders).toHaveLength(1);
+        expect(parsed.embedDownloaders[0].provider).toBe('vimeo');
+    });
+
+    it('preserves out.dir when omitted from save', () => {
+        writeEmbedConf(tmpDir, {
+            cookie: 'session=abc',
+            outDir: '/keep/this',
+            include: {},
+        });
+        writeEmbedConf(tmpDir, {
+            cookie: 'session=xyz',
+            include: { 'posts.with.media.type': 'video' },
+        });
+
+        const parsed = parseEmbedConf(readFileSync(join(tmpDir, 'embed.conf'), 'utf8'));
+        expect(parsed.cookie).toBe('session=xyz');
+        expect(parsed.outDir).toBe('/keep/this');
+        expect(parsed.include['posts.with.media.type']).toBe('video');
+    });
+
     it('roundtrips through parse and write', () => {
         const original = {
             cookie: 'my_cookie=value',

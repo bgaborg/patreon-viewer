@@ -176,61 +176,63 @@ async function readSinglePost(
     };
 }
 
+function publishedTime(published: string | undefined): number {
+    if (!published) return 0;
+    const time = Date.parse(published);
+    return Number.isNaN(time) ? 0 : time;
+}
+
 export async function findPostById(dataDir: string, postId: string): Promise<PostInfo | null> {
     const creatorDirs = await fs.readdir(dataDir);
-    for (const creatorDir of creatorDirs) {
-        if (creatorDir.startsWith('.')) continue;
-        const postsDir = path.join(dataDir, creatorDir, 'posts');
-        if (!(await fs.pathExists(postsDir))) continue;
-        const postDirs = await fs.readdir(postsDir);
-        for (const postDir of postDirs) {
-            if (!postDir.startsWith(`${postId} `)) continue;
+    const matches = await Promise.all(
+        creatorDirs.map(async (creatorDir) => {
+            if (creatorDir.startsWith('.')) return null;
+            const postsDir = path.join(dataDir, creatorDir, 'posts');
+            if (!(await fs.pathExists(postsDir))) return null;
+            const postDirs = await fs.readdir(postsDir);
+            const postDir = postDirs.find((dir) => dir.startsWith(`${postId} `));
+            if (!postDir) return null;
             const postPath = path.join(postsDir, postDir);
             const stats = await fs.stat(postPath);
-            if (!stats.isDirectory()) continue;
+            if (!stats.isDirectory()) return null;
             return readSinglePost(dataDir, creatorDir, postDir, postPath);
-        }
-    }
-    return null;
+        }),
+    );
+    return matches.find((post) => post !== null) ?? null;
 }
 
 export async function readPostData(dataDir: string, creatorFilter: string | null): Promise<PostInfo[]> {
     try {
-        const posts: PostInfo[] = [];
         const creatorDirs = await fs.readdir(dataDir);
+        const perCreator = await Promise.all(
+            creatorDirs.map(async (creatorDir) => {
+                if (creatorDir.startsWith('.')) return [];
+                if (creatorFilter && creatorDir !== creatorFilter) return [];
 
-        for (const creatorDir of creatorDirs) {
-            if (creatorDir.startsWith('.')) continue;
-            if (creatorFilter && creatorDir !== creatorFilter) continue;
+                const postsDir = path.join(dataDir, creatorDir, 'posts');
+                if (!(await fs.pathExists(postsDir))) return [];
 
-            const postsDir = path.join(dataDir, creatorDir, 'posts');
-            if (!(await fs.pathExists(postsDir))) continue;
+                const postDirs = await fs.readdir(postsDir);
+                const posts = await Promise.all(
+                    postDirs.map(async (postDir) => {
+                        if (postDir.startsWith('.')) return null;
+                        const postPath = path.join(postsDir, postDir);
+                        const stats = await fs.stat(postPath);
+                        if (!stats.isDirectory()) return null;
+                        try {
+                            return await readSinglePost(dataDir, creatorDir, postDir, postPath);
+                        } catch (error) {
+                            console.error(`Error reading post ${postDir}:`, (error as Error).message);
+                            return null;
+                        }
+                    }),
+                );
+                return posts.filter((post): post is PostInfo => post !== null);
+            }),
+        );
 
-            const postDirs = await fs.readdir(postsDir);
-
-            for (const postDir of postDirs) {
-                if (postDir.startsWith('.')) continue;
-
-                const postPath = path.join(postsDir, postDir);
-                const stats = await fs.stat(postPath);
-
-                if (stats.isDirectory()) {
-                    try {
-                        const post = await readSinglePost(dataDir, creatorDir, postDir, postPath);
-                        if (post) posts.push(post);
-                    } catch (error) {
-                        console.error(`Error reading post ${postDir}:`, (error as Error).message);
-                    }
-                }
-            }
-        }
-
-        posts.sort((a, b) => {
-            const dateA = new Date(a.published || 0).getTime();
-            const dateB = new Date(b.published || 0).getTime();
-            return dateB - dateA;
-        });
-
+        const posts = perCreator.flat();
+        posts.sort((a, b) => publishedTime(b.published) - publishedTime(a.published));
         return posts;
     } catch (error) {
         console.error('Error reading data directory:', error);
@@ -239,24 +241,24 @@ export async function readPostData(dataDir: string, creatorFilter: string | null
 }
 
 export async function getCreators(dataDir: string): Promise<Creator[]> {
-    const creators: Creator[] = [];
     const entries = await fs.readdir(dataDir);
+    const creators = await Promise.all(
+        entries.map(async (dir) => {
+            if (dir.startsWith('.')) return null;
+            const postsDir = path.join(dataDir, dir, 'posts');
+            if (!(await fs.pathExists(postsDir))) return null;
 
-    for (const dir of entries) {
-        if (dir.startsWith('.')) continue;
-        const postsDir = path.join(dataDir, dir, 'posts');
-        if (!(await fs.pathExists(postsDir))) continue;
+            let displayName = dir;
+            const infoFile = path.join(dataDir, dir, 'campaign_info', 'info.txt');
+            if (await fs.pathExists(infoFile)) {
+                const content = await fs.readFile(infoFile, 'utf8');
+                const parsed = parseInfoFile(content);
+                if (parsed.Name) displayName = parsed.Name;
+            }
 
-        let displayName = dir;
-        const infoFile = path.join(dataDir, dir, 'campaign_info', 'info.txt');
-        if (await fs.pathExists(infoFile)) {
-            const content = await fs.readFile(infoFile, 'utf8');
-            const parsed = parseInfoFile(content);
-            if (parsed.Name) displayName = parsed.Name;
-        }
+            return { dir, displayName };
+        }),
+    );
 
-        creators.push({ dir, displayName });
-    }
-
-    return creators;
+    return creators.filter((creator): creator is Creator => creator !== null);
 }
